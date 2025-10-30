@@ -1,0 +1,242 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+html {
+	scroll-behavior: smooth;
+}
+
+/* CSS Custom Properties for Dark Mode Color System */
+:root {
+  /* Light Mode Colors */
+  --background: #F9FAFB;
+  --foreground: #1E293B;
+  --card: #ffffff;
+  --card-foreground: #1E293B;
+  --popover: #ffffff;
+  --popover-foreground: #1E293B;
+  --primary: #2563EB;
+  --primary-foreground: #ffffff;
+  --secondary: #14B8A6;
+  --secondary-foreground: #ffffff;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #14B8A6;
+  --accent-foreground: #ffffff;
+  --destructive: #F43F5E;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --input-background: #ffffff;
+  --ring: #2563EB;
+  --chart-1: #2563EB;
+  --chart-2: #14B8A6;
+  --chart-3: #10B981;
+  --chart-4: #F59E0B;
+  --chart-5: #8B5CF6;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1E293B;
+  --sidebar-primary: #2563EB;
+  --sidebar-accent: #F1F5F9;
+  --sidebar-border: rgba(0, 0, 0, 0.1);
+  --sidebar-ring: #2563EB;
+  --switch-background: #E2E8F0;
+}
+
+.dark {
+  /* Dark Mode Colors */
+  --background: #0F172A;
+  --foreground: #F1F5F9;
+  --card: #1E293B;
+  --card-foreground: #F1F5F9;
+  --popover: #1E293B;
+  --popover-foreground: #F1F5F9;
+  --primary: #3B82F6;
+  --primary-foreground: #ffffff;
+  --secondary: #14B8A6;
+  --secondary-foreground: #ffffff;
+  --muted: #334155;
+  --muted-foreground: #94A3B8;
+  --accent: #14B8A6;
+  --accent-foreground: #ffffff;
+  --destructive: #F43F5E;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.1);
+  --input-background: #1E293B;
+  --ring: #3B82F6;
+  --chart-1: #3B82F6;
+  --chart-2: #14B8A6;
+  --chart-3: #10B981;
+  --chart-4: #F59E0B;
+  --chart-5: #8B5CF6;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --sidebar: #1E293B;
+  --sidebar-foreground: #F1F5F9;
+  --sidebar-primary: #3B82F6;
+  --sidebar-accent: #334155;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #3B82F6;
+  --switch-background: #475569;
+}
+
+/* Apply CSS variables to Tailwind classes */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+  }
+  
+  /* Smooth theme transitions */
+  * {
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                fill 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                stroke 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Custom component classes using CSS variables */
+@layer components {
+  .bg-background { background-color: var(--background); }
+  .bg-card { background-color: var(--card); }
+  .bg-popover { background-color: var(--popover); }
+  .bg-primary { background-color: var(--primary); }
+  .bg-secondary { background-color: var(--secondary); }
+  .bg-muted { background-color: var(--muted); }
+  .bg-accent { background-color: var(--accent); }
+  .bg-destructive { background-color: var(--destructive); }
+  .bg-input-background { background-color: var(--input-background); }
+  .bg-sidebar { background-color: var(--sidebar); }
+  .bg-switch-background { background-color: var(--switch-background); }
+  
+  .text-foreground { color: var(--foreground); }
+  .text-card-foreground { color: var(--card-foreground); }
+  .text-popover-foreground { color: var(--popover-foreground); }
+  .text-primary-foreground { color: var(--primary-foreground); }
+  .text-secondary-foreground { color: var(--secondary-foreground); }
+  .text-muted-foreground { color: var(--muted-foreground); }
+  .text-accent-foreground { color: var(--accent-foreground); }
+  .text-destructive-foreground { color: var(--destructive-foreground); }
+  .text-sidebar-foreground { color: var(--sidebar-foreground); }
+  .text-success { color: var(--success); }
+  .text-warning { color: var(--warning); }
+  
+  .border-border { border-color: var(--border); }
+  .border-sidebar-border { border-color: var(--sidebar-border); }
+  
+  .ring-ring { --tw-ring-color: var(--ring); }
+  .ring-sidebar-ring { --tw-ring-color: var(--sidebar-ring); }
+  
+  /* Chart colors */
+  .text-chart-1 { color: var(--chart-1); }
+  .text-chart-2 { color: var(--chart-2); }
+  .text-chart-3 { color: var(--chart-3); }
+  .text-chart-4 { color: var(--chart-4); }
+  .text-chart-5 { color: var(--chart-5); }
+  
+  .bg-chart-1 { background-color: var(--chart-1); }
+  .bg-chart-2 { background-color: var(--chart-2); }
+  .bg-chart-3 { background-color: var(--chart-3); }
+  .bg-chart-4 { background-color: var(--chart-4); }
+  .bg-chart-5 { background-color: var(--chart-5); }
+}
+
+/* Custom animations for theme transition */
+@keyframes slideInFromRight {
+  0% {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.slide-in-from-right {
+  animation: slideInFromRight 0.3s ease-out forwards;
+}
+
+/* Custom animations for toast notifications */
+@keyframes slideInFromBottomRight {
+  0% {
+    opacity: 0;
+    transform: translateX(100%) translateY(100%) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+}
+
+@keyframes slideOutToRight {
+  0% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%) scale(0.8);
+  }
+}
+
+/* Toast animation classes - targeting sonner's internal structure */
+[data-sonner-toaster] [data-sonner-toast] {
+  animation: slideInFromBottomRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  transform-origin: bottom right !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-state='closing'] {
+  animation: slideOutToRight 0.4s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+  transform-origin: bottom right !important;
+}
+
+/* Ensure toasts are positioned correctly */
+[data-sonner-toaster] {
+  position: fixed !important;
+  bottom: 1rem !important;
+  right: 1rem !important;
+  z-index: 9999 !important;
+  pointer-events: none !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] {
+  pointer-events: auto !important;
+  margin-bottom: 0.5rem !important;
+}
+
+/* Custom animations for expand/collapse */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+  }
+  to {
+    opacity: 1;
+    max-height: 2000px;
+  }
+}
+
+.expand-animation {
+  animation: fadeIn 0.3s ease-in-out forwards;
+}
