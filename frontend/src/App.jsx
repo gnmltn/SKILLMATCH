@@ -43,7 +43,7 @@ function AppContent() {
           position="bottom-right" 
           richColors 
           expand={true}
-          closeButton={true}
+          closeButton={false}
         />
         
         {/* Theme Transition Animation */}

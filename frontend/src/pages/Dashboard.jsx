@@ -482,11 +482,15 @@ export default function Dashboard() {
           )}
         </section>
 
-        <section className="mt-8 bg-[#1e293b] rounded-2xl border-2 border-primary/20 p-6">
+        <section className={`mt-8 rounded-2xl border-2 border-primary/20 p-6 transition-colors duration-200 ${
+          isDarkMode ? 'bg-[#1e293b]' : 'bg-card'
+        }`}>
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#1e293b] flex items-center justify-center">
-                <Briefcase size={20} className="text-white" />
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                isDarkMode ? 'bg-[#1e293b]' : 'bg-muted/30'
+              }`}>
+                <Briefcase size={20} className={isDarkMode ? 'text-white' : 'text-card-foreground'} />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-card-foreground">Your Career Path Match</h3>
