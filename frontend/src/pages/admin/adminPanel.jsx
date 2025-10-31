@@ -1364,52 +1364,49 @@ const ActivityLog = () => {
   }, [autoRefresh]);
 
   const loadActivities = async () => {
-    try {
-      setLoading(true);
-      
-      const cleanFilters = { ...filters };
-      Object.keys(cleanFilters).forEach(key => {
-        if (cleanFilters[key] === '' || cleanFilters[key] === 'all') {
-          delete cleanFilters[key];
-        }
-      });
-
-      console.log('🔄 Loading activities with filters:', cleanFilters);
-      
-      const data = await fetchActivityLogsWithFilters(cleanFilters);
-      console.log('✅ Activities data received:', data);
-
-      if (data && data.activities) {
-        const userActivities = data.activities.filter(activity => 
-          !isAdminActivity(activity.user) && !isAdminActivity(activity.action)
-        );
-        
-        setActivities(userActivities);
-        setPagination(data.pagination || {
-          currentPage: 1,
-          totalPages: 1,
-          totalActivities: userActivities.length,
-          hasNext: false,
-          hasPrev: false
-        });
-      } else {
-        setActivities([]);
-        setPagination({
-          currentPage: 1,
-          totalPages: 1,
-          totalActivities: 0,
-          hasNext: false,
-          hasPrev: false
-        });
+  try {
+    setLoading(true);
+    
+    const cleanFilters = { ...filters };
+    Object.keys(cleanFilters).forEach(key => {
+      if (cleanFilters[key] === '' || cleanFilters[key] === 'all') {
+        delete cleanFilters[key];
       }
-    } catch (error) {
-      console.error('❌ Error loading activities:', error);
-      toast.error('Failed to load user activity logs');
+    });
+
+    console.log('🔄 Loading student activities with filters:', cleanFilters);
+    
+    const data = await fetchActivityLogsWithFilters(cleanFilters);
+    console.log('✅ Student activities data received:', data);
+
+    if (data && data.activities) {
+      // The API now only returns student activities, so no need to filter
+      setActivities(data.activities);
+      setPagination(data.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalActivities: data.activities.length,
+        hasNext: false,
+        hasPrev: false
+      });
+    } else {
       setActivities([]);
-    } finally {
-      setLoading(false);
+      setPagination({
+        currentPage: 1,
+        totalPages: 1,
+        totalActivities: 0,
+        hasNext: false,
+        hasPrev: false
+      });
     }
-  };
+  } catch (error) {
+    console.error('❌ Error loading student activities:', error);
+    toast.error('Failed to load student activity logs');
+    setActivities([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const isAdminActivity = (text) => {
     if (!text) return false;

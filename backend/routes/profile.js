@@ -1,6 +1,7 @@
 import express from "express";
 import User from "../models/User.js";
 import { protect } from "../middleware/auth.js";
+import StudentActivityLogger from "../utils/studentActivityLogger.js";
 
 const router = express.Router();
 
@@ -89,6 +90,14 @@ router.patch("/user", protect, async (req, res) => {
       }
     }
 
+    // Track which fields are being updated
+    const updatedFields = [];
+    if (firstName.trim() !== user.firstName) updatedFields.push('firstName');
+    if (lastName.trim() !== user.lastName) updatedFields.push('lastName');
+    if (email.toLowerCase() !== user.email) updatedFields.push('email');
+    if (course?.trim() !== user.course) updatedFields.push('course');
+    if (yearLevel !== user.yearLevel) updatedFields.push('yearLevel');
+
     user.firstName = firstName.trim();
     user.lastName = lastName.trim();
     user.email = email.toLowerCase().trim();
@@ -100,6 +109,15 @@ router.patch("/user", protect, async (req, res) => {
     }
 
     await user.save();
+
+    // Log profile update activity
+    if (updatedFields.length > 0) {
+      await StudentActivityLogger.logProfileUpdate(
+        user._id, 
+        user, 
+        updatedFields
+      );
+    }
 
     const updatedUser = await User.findById(req.user._id).select('-password');
 
@@ -157,6 +175,15 @@ router.patch("/avatar", protect, async (req, res) => {
 
     user.profilePicture = profilePicture;
     await user.save();
+
+    // Log profile picture update activity
+    await StudentActivityLogger.logActivity(
+      user._id, 
+      user, 
+      'Updated profile picture', 
+      'profile', 
+      { action: 'avatar_update' }
+    );
 
     console.log("Profile picture updated for user:", user._id);
 
@@ -228,12 +255,24 @@ router.post("/skills", protect, async (req, res) => {
       category: category.trim()
     };
 
-   
     user.skills.push(newSkill);
     await user.save();
 
     const addedSkill = user.skills[user.skills.length - 1];
     console.log("Skill added successfully:", addedSkill);
+
+    // Log skill addition activity
+    await StudentActivityLogger.logActivity(
+      user._id, 
+      user, 
+      `Added new skill: ${name} at level ${level}`, 
+      'skill', 
+      { 
+        skillName: name,
+        level: level,
+        category: category
+      }
+    );
 
     return res.status(201).json({
       success: true,
@@ -265,10 +304,23 @@ router.patch("/skills/:skillId", protect, async (req, res) => {
       return res.status(404).json({ message: "Skill not found" });
     }
 
+    const previousLevel = skill.level;
+    
     if (level !== undefined) skill.level = level;
     if (name !== undefined) skill.name = name;
 
     await user.save();
+
+    // Log skill update activity
+    if (level !== undefined && level !== previousLevel) {
+      await StudentActivityLogger.logSkillUpdate(
+        user._id, 
+        user, 
+        skill.name, 
+        previousLevel, 
+        level
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -287,7 +339,15 @@ router.delete("/skills/:skillId", protect, async (req, res) => {
 
     console.log("DELETE Request - Skill ID:", skillId, "User ID:", userId);
 
-    // Alternative approach using findByIdAndUpdate
+    // Get user and skill details before deletion for logging
+    const userBeforeDelete = await User.findById(userId);
+    const skillToDelete = userBeforeDelete.skills.id(skillId);
+    
+    if (!skillToDelete) {
+      return res.status(404).json({ message: "Skill not found" });
+    }
+
+    // Delete the skill
     const result = await User.findByIdAndUpdate(
       userId,
       { $pull: { skills: { _id: skillId } } },
@@ -298,11 +358,18 @@ router.delete("/skills/:skillId", protect, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Check if skill was actually removed
-    const skillStillExists = result.skills.some(skill => skill._id.toString() === skillId);
-    if (skillStillExists) {
-      return res.status(404).json({ message: "Skill not found" });
-    }
+    // Log skill deletion activity
+    await StudentActivityLogger.logActivity(
+      userId, 
+      userBeforeDelete, 
+      `Deleted skill: ${skillToDelete.name}`, 
+      'skill', 
+      { 
+        skillName: skillToDelete.name,
+        previousLevel: skillToDelete.level,
+        category: skillToDelete.category
+      }
+    );
 
     return res.status(200).json({
       success: true,

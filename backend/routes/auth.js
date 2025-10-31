@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import { OAuth2Client } from 'google-auth-library';
 import PasswordReset from '../models/PasswordReset.js';
 import { sendOTPEmail, verifyGmailExists } from '../utils/emailService.js';
+import StudentActivityLogger from '../utils/studentActivityLogger.js';
 
 const router = express.Router();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -172,6 +173,8 @@ router.post("/signup/verify-otp", async (req, res) => {
 
     const user = await User.create(userData);
 
+    await StudentActivityLogger.logRegistration(user._id, user);
+
     otpRecord.isUsed = true;
     await otpRecord.save();
 
@@ -239,6 +242,13 @@ router.post("/login/send-otp", async (req, res) => {
     const isPasswordValid = await user.matchPassword(password);
 
     if (!isPasswordValid) {
+      await StudentActivityLogger.logFailedLogin(
+        user._id, 
+        user, 
+        req.ip, 
+        req.get('User-Agent')
+      );
+      
       return res.status(401).json({ 
         success: false,
         message: "Invalid email or password" 
@@ -311,6 +321,13 @@ router.post("/login/verify-otp", async (req, res) => {
         message: "User not found" 
       });
     }
+    
+    await StudentActivityLogger.logLogin(
+      user._id, 
+      user, 
+      req.ip, 
+      req.get('User-Agent')
+    );
 
     otpRecord.isUsed = true;
     await otpRecord.save();
@@ -474,11 +491,25 @@ router.post("/login", async (req, res) => {
     const isPasswordValid = await user.matchPassword(password);
 
     if (!isPasswordValid) {
+      await StudentActivityLogger.logFailedLogin(
+        user._id, 
+        user, 
+        req.ip, 
+        req.get('User-Agent')
+      );
+
       return res.status(401).json({ 
         success: false,
         message: "Invalid email or password" 
       });
     }
+
+    await StudentActivityLogger.logLogin(
+      user._id, 
+      user, 
+      req.ip, 
+      req.get('User-Agent')
+    );
 
     const token = generateToken(user._id);
 
@@ -609,7 +640,16 @@ router.post("/google", async (req, res) => {
         userType: "student",
         profilePicture: payload.picture || null
       });
+
+      await StudentActivityLogger.logRegistration(user._id, user);
     }
+
+    await StudentActivityLogger.logLogin(
+      user._id, 
+      user, 
+      req.ip, 
+      req.get('User-Agent')
+    );
 
     // Generate token for Google user
     const token = generateToken(user._id);
