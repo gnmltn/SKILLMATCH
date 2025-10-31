@@ -482,10 +482,10 @@ export default function Dashboard() {
           )}
         </section>
 
-        <section className="mt-8 bg-gradient-to-r from-primary/5 to-secondary/5 rounded-2xl border-2 border-primary/20 p-6">
+        <section className="mt-8 bg-[#1e293b] rounded-2xl border-2 border-primary/20 p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-[#1e293b] flex items-center justify-center">
                 <Briefcase size={20} className="text-white" />
               </div>
               <div>

@@ -46,7 +46,26 @@ const Login = () => {
       }
 
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // Store minimal user data to avoid localStorage quota issues
+      const minimalUserData = {
+        _id: data.user._id,
+        id: data.user.id,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
+        email: data.user.email,
+        profilePicture: data.user.profilePicture,
+        course: data.user.course,
+        yearLevel: data.user.yearLevel,
+        userType: data.user.userType
+      };
+      
+      try {
+        localStorage.setItem('user', JSON.stringify(minimalUserData));
+      } catch (storageError) {
+        console.error('Failed to store user data:', storageError);
+        localStorage.setItem('user', JSON.stringify({ _id: data.user._id, email: data.user.email }));
+      }
+      
       navigate('/dashboard');
     } catch (error) {
       console.error('Google login error:', error);
@@ -135,19 +154,65 @@ const Login = () => {
         body: JSON.stringify({ email: tempEmail, otp }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setOtpError(data.message || 'Invalid OTP. Please try again.');
+      // Parse JSON response (can only read response body once)
+      let data;
+      try {
+        const text = await response.text();
+        if (!text) {
+          throw new Error('Empty response from server');
+        }
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError, 'Response status:', response.status);
+        setOtpError('Invalid response from server. Please try again.');
         return;
       }
 
+      // Check if response is ok after parsing JSON
+      if (!response.ok) {
+        setOtpError(data.message || `Server error: ${response.status} ${response.statusText}`);
+        return;
+      }
+
+      // Validate response structure
+      if (!data.success) {
+        setOtpError(data.message || 'Login failed. Please try again.');
+        return;
+      }
+
+      if (!data.token || !data.user) {
+        console.error('Missing token or user data:', data);
+        setOtpError('Invalid response format. Please try again.');
+        return;
+      }
+
+      // Store token and minimal user data (to avoid localStorage quota issues)
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const minimalUserData = {
+        _id: data.user._id,
+        id: data.user.id,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
+        email: data.user.email,
+        profilePicture: data.user.profilePicture,
+        course: data.user.course,
+        yearLevel: data.user.yearLevel,
+        userType: data.user.userType
+      };
+      
+      try {
+        localStorage.setItem('user', JSON.stringify(minimalUserData));
+      } catch (storageError) {
+        console.error('Failed to store user data:', storageError);
+        // Still proceed with login - user data can be fetched from API
+        localStorage.setItem('user', JSON.stringify({ _id: data.user._id, email: data.user.email }));
+      }
+      
+      // Navigate to dashboard
       navigate('/dashboard');
     } catch (error) {
       console.error('Verify OTP error:', error);
-      setOtpError('An error occurred. Please try again.');
+      setOtpError(error.message || 'An error occurred. Please try again.');
     } finally {
       setIsVerifyingOTP(false);
     }
