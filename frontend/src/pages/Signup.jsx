@@ -142,9 +142,26 @@ const Signup = () => {
         return;
       }
 
-      // Store token and user data
+      // Store token and minimal user data (to avoid localStorage quota issues)
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const minimalUserData = {
+        _id: data.user._id,
+        id: data.user.id,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
+        email: data.user.email,
+        profilePicture: data.user.profilePicture,
+        course: data.user.course,
+        yearLevel: data.user.yearLevel,
+        userType: data.user.userType
+      };
+      
+      try {
+        localStorage.setItem('user', JSON.stringify(minimalUserData));
+      } catch (storageError) {
+        console.error('Failed to store user data:', storageError);
+        localStorage.setItem('user', JSON.stringify({ _id: data.user._id, email: data.user.email }));
+      }
 
       // Redirect to login or dashboard
       navigate('/login');

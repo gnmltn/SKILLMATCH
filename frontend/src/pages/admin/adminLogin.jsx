@@ -37,7 +37,25 @@ export default function AdminLogin() {
         const { token, user } = response.data;
         
         localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
+        // Store minimal user data to avoid localStorage quota issues
+        const minimalUserData = {
+          _id: user._id,
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          profilePicture: user.profilePicture,
+          userType: user.userType,
+          isAdmin: user.isAdmin || true
+        };
+        
+        try {
+          localStorage.setItem('user', JSON.stringify(minimalUserData));
+        } catch (storageError) {
+          console.error('Failed to store user data:', storageError);
+          localStorage.setItem('user', JSON.stringify({ _id: user._id, email: user.email, isAdmin: true }));
+        }
+        
         localStorage.setItem('isAdmin', 'true');
         toast.success('Welcome back, Admin!');
         navigate('/admin/adminPanel'); 

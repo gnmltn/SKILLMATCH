@@ -319,11 +319,12 @@ router.post("/login/verify-otp", async (req, res) => {
 
     console.log("LOGIN SUCCESSFUL for user:", user._id);
     
-    return res.status(200).json({
+    // Prepare response data
+    const responseData = {
       success: true,
       message: "Logged in successfully",
       user: {
-        _id: user._id,
+        _id: user._id.toString(),
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
@@ -331,12 +332,16 @@ router.post("/login/verify-otp", async (req, res) => {
         profilePicture: user.profilePicture,
         course: user.course,
         yearLevel: user.yearLevel,
-        skills: user.skills,
-        projectHistory: user.projectHistory,
-        recommendations: user.recommendations
+        skills: user.skills || [],
+        projectHistory: user.projectHistory || [],
+        recommendations: user.recommendations || []
       },
       token
-    });
+    };
+
+    console.log("Sending response:", JSON.stringify(responseData).substring(0, 200) + "...");
+    
+    return res.status(200).json(responseData);
 
   } catch (error) {
     console.error("LOGIN VERIFY OTP ERROR:", error);

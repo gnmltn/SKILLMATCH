@@ -1,5 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import Admin from '../models/Admin.js';
 import User from '../models/User.js';
 
@@ -29,7 +31,84 @@ router.post("/login", async (req, res) => {
     const cleanEmail = email.toLowerCase().trim();
     console.log("Cleaned email:", cleanEmail);
 
+    // Debug: Check MongoDB connection and database info
+    const dbName = mongoose.connection.name;
+    const adminCollectionName = Admin.collection.name;
+    console.log("🔍 DEBUG - MongoDB Connection Info:", {
+      databaseName: dbName,
+      collectionName: adminCollectionName,
+      connectionState: mongoose.connection.readyState === 1 ? 'Connected' : 'Not Connected'
+    });
+
+    // Debug: Check all admins in the database via Mongoose
+    const allAdmins = await Admin.find({});
+    console.log("🔍 DEBUG - Mongoose query result:", allAdmins.length, "admins found");
+    console.log("🔍 DEBUG - All admins in database:", allAdmins.map(a => ({
+      _id: a._id,
+      id: a.id,
+      email: a.email,
+      emailType: typeof a.email,
+      emailLength: a.email?.length,
+      name: a.name
+    })));
+
+    // Try exact match first
     let admin = await Admin.findOne({ email: cleanEmail });
+    
+    // If Mongoose query returns empty, try direct MongoDB query bypassing Mongoose schema
+    if (!admin) {
+      try {
+        const directCollection = mongoose.connection.db.collection('admin');
+        const directAdmins = await directCollection.find({}).toArray();
+        console.log("🔍 DEBUG - Direct MongoDB query (bypassing Mongoose):", directAdmins.length, "documents found");
+        if (directAdmins.length > 0) {
+          console.log("🔍 DEBUG - Direct query results:", directAdmins.map(a => ({
+            _id: a._id,
+            id: a.id,
+            email: a.email,
+            name: a.name,
+            hasPassword: !!a.password
+          })));
+          
+          // If found via direct query but not Mongoose, try to use the direct result
+          const matchingAdmin = directAdmins.find(a => 
+            a.email?.toString().toLowerCase().trim() === cleanEmail
+          );
+          
+          if (matchingAdmin) {
+            console.log("✅ Found admin via direct MongoDB query!");
+            // Load the document using Mongoose by _id
+            admin = await Admin.findById(matchingAdmin._id);
+            if (!admin) {
+              // If still not found, create a new instance from the raw data
+              admin = new Admin(matchingAdmin);
+              // Manually set password from raw data
+              admin.password = matchingAdmin.password;
+            }
+          }
+        }
+      } catch (err) {
+        console.log("🔍 DEBUG - Direct query error:", err.message);
+      }
+    }
+    
+    // If not found, try case-insensitive regex search (handles case mismatches)
+    if (!admin) {
+      console.log("🔍 Trying case-insensitive search...");
+      admin = await Admin.findOne({ 
+        email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+    }
+    
+    // If still not found, try trimming whitespace from stored emails
+    if (!admin) {
+      console.log("🔍 Trying to find by trimming whitespace...");
+      const allAdminsRaw = await Admin.find({});
+      admin = allAdminsRaw.find(a => a.email?.trim().toLowerCase() === cleanEmail);
+    }
+    
+    console.log("🔍 DEBUG - Query result:", admin ? "Found admin" : "No admin found");
+    console.log("🔍 DEBUG - Searching for email:", cleanEmail);
     
     if (admin) {
       console.log("✅ Admin found in Admin collection:", {
@@ -41,7 +120,23 @@ router.post("/login", async (req, res) => {
       });
 
       console.log("Starting password comparison...");
-      const isPasswordValid = await admin.matchPassword(password);
+      let isPasswordValid = false;
+      
+      // If admin was created from raw MongoDB data, validate password directly
+      if (admin.password && typeof admin.matchPassword === 'function') {
+        isPasswordValid = await admin.matchPassword(password);
+      } else {
+        // Fallback: direct password comparison
+        const storedPassword = admin.password;
+        if (storedPassword && storedPassword.startsWith('$2')) {
+          // Hashed password - use bcrypt
+          isPasswordValid = await bcrypt.compare(password, storedPassword);
+        } else {
+          // Plain text password
+          isPasswordValid = storedPassword === password;
+        }
+      }
+      
       console.log("Password comparison result:", isPasswordValid);
 
       if (!isPasswordValid) {
