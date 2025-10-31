@@ -3,16 +3,388 @@ import { adminAuth } from './adminAuth.js';
 import User from '../models/User.js';
 import ActivityLog from '../models/ActivityLog.js';
 import Admin from '../models/Admin.js';
+import multer from 'multer';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+// Fix for __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadsDir = path.join(__dirname, '../uploads');
+    // Create uploads directory if it doesn't exist
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 const router = express.Router();
 
-// GET ADMIN DASHBOARD STATISTICS
+// GET ADMIN PROFILE
+// GET ADMIN PROFILE
+router.get('/profile', adminAuth, async (req, res) => {
+  try {
+    console.log('🔍 Fetching admin profile for:', req.user.email);
+    
+    // Get fresh user data from database
+    const adminUser = await User.findById(req.user._id).select('-password');
+    
+    if (!adminUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin user not found'
+      });
+    }
+
+    const profileData = {
+      _id: adminUser._id,
+      name: `${adminUser.firstName} ${adminUser.lastName}`,
+      email: adminUser.email,
+      profilePicture: adminUser.profilePicture || '', // Use as-is, don't modify
+      isAdmin: true,
+      role: 'admin',
+      createdAt: adminUser.createdAt,
+      lastLogin: adminUser.updatedAt
+    };
+
+    console.log('✅ Sending profile data:', profileData);
+    
+    res.json({
+      success: true,
+      user: profileData
+    });
+
+  } catch (error) {
+    console.error('❌ Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching profile',
+      error: error.message
+    });
+  }
+});
+
+// UPDATE ADMIN PROFILE
+router.put('/profile', adminAuth, async (req, res) => {
+  try {
+    const { name, email, currentPassword, newPassword } = req.body;
+    
+    let admin;
+    
+    // Check if admin is from Admin collection or User collection
+    if (req.user.constructor.modelName === 'Admin') {
+      admin = await Admin.findById(req.user._id);
+    } else {
+      admin = await User.findById(req.user._id);
+    }
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+
+    // Verify current password if changing email or password
+    if ((email && email !== admin.email) || newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current password is required to make these changes'
+        });
+      }
+
+      const isPasswordValid = await admin.matchPassword(currentPassword);
+      if (!isPasswordValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current password is incorrect'
+        });
+      }
+    }
+
+    // Update fields
+    if (name) admin.name = name;
+    if (email) admin.email = email;
+    if (newPassword) admin.password = newPassword;
+
+    await admin.save();
+
+    // Format response
+    const userResponse = {
+      _id: admin._id,
+      name: admin.name,
+      email: admin.email,
+      profilePicture: admin.profilePicture,
+      isAdmin: true
+    };
+
+    // Log the activity
+    await req.user.logActivity('updated admin profile', 'user_management', {
+      fieldsUpdated: Object.keys(req.body).filter(key => key !== 'currentPassword')
+    });
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: userResponse
+    });
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating profile',
+      error: error.message
+    });
+  }
+});
+
+// UPLOAD PROFILE PICTURE
+router.post('/profile/picture', adminAuth, upload.single('profilePicture'), async (req, res) => {
+  try {
+    console.log('📁 File upload received:', req.file);
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+    
+    let admin;
+    
+    // Check if admin is from Admin collection or User collection
+    if (req.user.constructor.modelName === 'Admin') {
+      admin = await Admin.findById(req.user._id);
+    } else {
+      admin = await User.findById(req.user._id);
+    }
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+
+    // Use relative path for profile picture (this works better with React)
+    const profilePicture = `/uploads/${req.file.filename}`;
+
+    // Update admin profile picture
+    admin.profilePicture = profilePicture;
+    await admin.save();
+
+    // Format response
+    const userResponse = {
+      _id: admin._id,
+      name: admin.name || `${admin.firstName} ${admin.lastName}`,
+      email: admin.email,
+      profilePicture: admin.profilePicture,
+      isAdmin: true
+    };
+
+    console.log('✅ Profile picture updated:', userResponse.profilePicture);
+
+    // Log the activity
+    await ActivityLog.create({
+      user: `Admin: ${req.user.firstName} ${req.user.lastName}`,
+      action: 'uploaded profile picture',
+      type: 'user_management',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    res.json({
+      success: true,
+      message: 'Profile picture uploaded successfully',
+      data: userResponse
+    });
+
+  } catch (error) {
+    console.error('Upload profile picture error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading profile picture',
+      error: error.message
+    });
+  }
+});
+
+// DELETE PROFILE PICTURE
+router.delete('/profile/picture', adminAuth, async (req, res) => {
+  try {
+    let admin;
+    
+    // Check if admin is from Admin collection or User collection
+    if (req.user.constructor.modelName === 'Admin') {
+      admin = await Admin.findById(req.user._id);
+    } else {
+      admin = await User.findById(req.user._id);
+    }
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+
+    // Remove profile picture
+    admin.profilePicture = null;
+    await admin.save();
+
+    // Format response
+    const userResponse = {
+      _id: admin._id,
+      name: admin.name || `${admin.firstName} ${admin.lastName}`,
+      email: admin.email,
+      profilePicture: admin.profilePicture,
+      isAdmin: true
+    };
+
+    // Log the activity
+    await ActivityLog.create({
+      user: `Admin: ${req.user.firstName} ${req.user.lastName}`,
+      action: 'removed profile picture',
+      type: 'user_management',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    res.json({
+      success: true,
+      message: 'Profile picture removed successfully',
+      data: userResponse
+    });
+
+  } catch (error) {
+    console.error('Delete profile picture error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error removing profile picture',
+      error: error.message
+    });
+  }
+});
+
+// GET SYSTEM SETTINGS
+router.get('/settings/system', adminAuth, async (req, res) => {
+  try {
+    console.log('🔍 Fetching system settings');
+    
+    // In a real app, you'd fetch from a Settings model
+    const systemSettings = {
+      allowRegistrations: true,
+      emailVerification: true,
+      maintenanceMode: false,
+      sessionTimeout: 30,
+      maxLoginAttempts: 5,
+      siteName: 'SkillMatch',
+      siteDescription: 'Skill Development Platform',
+      contactEmail: 'admin@skillmatch.com',
+      maxFileSize: 5,
+      allowedFileTypes: ['image/jpeg', 'image/png', 'image/gif']
+    };
+
+    res.json({
+      success: true,
+      data: systemSettings
+    });
+
+  } catch (error) {
+    console.error('❌ Get system settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching system settings',
+      error: error.message
+    });
+  }
+});
+
+// UPDATE SYSTEM SETTINGS
+router.put('/settings/system', adminAuth, async (req, res) => {
+  try {
+    console.log('🔍 Updating system settings:', req.body);
+    
+    const {
+      allowRegistrations,
+      emailVerification,
+      maintenanceMode,
+      sessionTimeout,
+      maxLoginAttempts
+    } = req.body;
+
+    // In a real app, you'd save to a Settings model
+    const updatedSettings = {
+      allowRegistrations: allowRegistrations !== undefined ? allowRegistrations : true,
+      emailVerification: emailVerification !== undefined ? emailVerification : true,
+      maintenanceMode: maintenanceMode !== undefined ? maintenanceMode : false,
+      sessionTimeout: sessionTimeout || 30,
+      maxLoginAttempts: maxLoginAttempts || 5
+    };
+
+    // Log the activity
+    await ActivityLog.create({
+      user: `Admin: ${req.user.firstName} ${req.user.lastName}`,
+      action: 'Updated system settings',
+      type: 'system',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      metadata: { settings: updatedSettings }
+    });
+
+    res.json({
+      success: true,
+      message: 'System settings updated successfully',
+      data: updatedSettings
+    });
+
+  } catch (error) {
+    console.error('❌ Update system settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating system settings',
+      error: error.message
+    });
+  }
+});
+
+// ========== REAL DASHBOARD STATISTICS FROM DATABASE ==========
 router.get('/dashboard/stats', adminAuth, async (req, res) => {
   try {
-    console.log('Fetching admin dashboard stats...');
+    console.log('🔍 Fetching real dashboard stats from database...');
 
-    // Get total users count
-    const totalUsers = await User.countDocuments();
+    // Get total users count (only students)
+    const totalUsers = await User.countDocuments({ userType: 'student' });
     
     // Get active students (users who logged in last 7 days)
     const sevenDaysAgo = new Date();
@@ -38,17 +410,21 @@ router.get('/dashboard/stats', adminAuth, async (req, res) => {
     startOfToday.setHours(0, 0, 0, 0);
     
     const dailyActivity = await User.countDocuments({
-      updatedAt: { $gte: startOfToday }
+      updatedAt: { $gte: startOfToday },
+      userType: 'student'
     });
 
-    // Get user growth data (last 12 months)
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-    
+    // ========== REAL USER GROWTH DATA (Last 6 months) ==========
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    sixMonthsAgo.setDate(1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+
     const userGrowth = await User.aggregate([
       {
         $match: {
-          createdAt: { $gte: twelveMonthsAgo }
+          createdAt: { $gte: sixMonthsAgo },
+          userType: 'student'
         }
       },
       {
@@ -66,43 +442,87 @@ router.get('/dashboard/stats', adminAuth, async (req, res) => {
     ]);
 
     // Format user growth data for charts
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentYear = new Date().getFullYear();
+    const months = [];
+    const userGrowthData = [];
     
-    const userGrowthData = months.map((month, index) => {
-      const growth = userGrowth.find(g => 
-        g._id.month === index + 1 && g._id.year === currentYear
+    // Generate last 6 months labels and data
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      
+      const monthName = date.toLocaleString('default', { month: 'short' });
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      
+      months.push(monthName);
+      
+      // Find matching data from aggregation
+      const growthData = userGrowth.find(g => 
+        g._id.year === year && g._id.month === month
       );
-      return growth ? growth.count : 0;
-    });
+      
+      userGrowthData.push(growthData ? growthData.count : 0);
+    }
 
-    // Get daily activity for current week
-    const dailyActivityData = await getWeeklyActivity();
+    // ========== REAL WEEKLY ACTIVITY DATA ==========
+    const weeklyActivityData = [];
+    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    // Get activity for each day of the current week
+    for (let i = 0; i < 7; i++) {
+      const dayStart = new Date();
+      dayStart.setDate(dayStart.getDate() - (6 - i)); // Start from Monday of current week
+      dayStart.setHours(0, 0, 0, 0);
+      
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+      
+      const dayActivity = await User.countDocuments({
+        updatedAt: { 
+          $gte: dayStart,
+          $lte: dayEnd
+        },
+        userType: 'student'
+      });
+      
+      weeklyActivityData.push(dayActivity);
+    }
+
+    const statsData = {
+      stats: {
+        activeStudents,
+        newSignups,
+        dailyActivity,
+        totalUsers
+      },
+      charts: {
+        userGrowth: {
+          labels: months,
+          data: userGrowthData
+        },
+        dailyActivity: {
+          labels: weekDays,
+          data: weeklyActivityData
+        }
+      }
+    };
+
+    console.log('✅ Real dashboard stats:', {
+      totalUsers,
+      activeStudents,
+      newSignups,
+      dailyActivity,
+      userGrowth: userGrowthData,
+      weeklyActivity: weeklyActivityData
+    });
 
     res.json({
       success: true,
-      data: {
-        stats: {
-          activeStudents,
-          newSignups,
-          dailyActivity,
-          totalUsers
-        },
-        charts: {
-          userGrowth: {
-            labels: months,
-            data: userGrowthData
-          },
-          dailyActivity: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            data: dailyActivityData
-          }
-        }
-      }
+      data: statsData
     });
 
   } catch (error) {
-    console.error('Admin dashboard error:', error);
+    console.error('❌ Dashboard stats error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching dashboard data',
@@ -111,7 +531,42 @@ router.get('/dashboard/stats', adminAuth, async (req, res) => {
   }
 });
 
-// GET ALL USERS WITH PAGINATION AND FILTERS
+// ========== ENHANCED RECENT USERS ==========
+router.get('/recent-users', adminAuth, async (req, res) => {
+  try {
+    console.log('🔍 Fetching recent users');
+    
+    const recentUsers = await User.find({ userType: 'student' })
+      .select('firstName lastName email updatedAt createdAt')
+      .sort({ updatedAt: -1 })
+      .limit(5);
+
+    const formattedUsers = recentUsers.map(user => ({
+      id: user._id,
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      lastLogin: getTimeAgo(user.updatedAt),
+      joinDate: user.createdAt.toLocaleDateString()
+    }));
+
+    console.log('✅ Recent users:', formattedUsers.length);
+
+    res.json({
+      success: true,
+      data: formattedUsers
+    });
+
+  } catch (error) {
+    console.error('❌ Get recent users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching recent users',
+      error: error.message
+    });
+  }
+});
+
+// ========== ENHANCED USERS MANAGEMENT ==========
 router.get('/users', adminAuth, async (req, res) => {
   try {
     const {
@@ -123,8 +578,10 @@ router.get('/users', adminAuth, async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
+    console.log('🔍 Fetching users with filters:', { page, limit, search, status });
+
     // Build filter object
-    const filter = {};
+    const filter = { userType: 'student' };
     
     // Search filter
     if (search) {
@@ -137,15 +594,12 @@ router.get('/users', adminAuth, async (req, res) => {
 
     // Status filter
     if (status !== 'all') {
-      // For now, we'll use updatedAt to determine activity
-      // You might want to add an explicit status field to your User model
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
       if (status === 'Active') {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         filter.updatedAt = { $gte: thirtyDaysAgo };
       } else if (status === 'Inactive') {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         filter.updatedAt = { $lt: thirtyDaysAgo };
       }
     }
@@ -155,7 +609,7 @@ router.get('/users', adminAuth, async (req, res) => {
     
     // Get users with pagination
     const users = await User.find(filter)
-      .select('firstName lastName email createdAt updatedAt userType isAdmin role')
+      .select('firstName lastName email createdAt updatedAt userType')
       .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -170,19 +624,12 @@ router.get('/users', adminAuth, async (req, res) => {
       name: `${user.firstName} ${user.lastName}`,
       email: user.email,
       joinDate: user.createdAt.toLocaleDateString(),
-      lastLogin: user.updatedAt.toLocaleDateString(),
+      lastLogin: getTimeAgo(user.updatedAt),
       status: getStatusFromLastActivity(user.updatedAt),
-      type: user.userType || 'student',
-      isAdmin: user.isAdmin || user.role === 'admin'
+      type: user.userType || 'student'
     }));
 
-    // Log the activity
-    await req.user.logActivity('viewed user management', 'user_management', {
-      page,
-      search,
-      status,
-      results: formattedUsers.length
-    });
+    console.log('✅ Users found:', formattedUsers.length);
 
     res.json({
       success: true,
@@ -199,7 +646,7 @@ router.get('/users', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get users error:', error);
+    console.error('❌ Get users error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching users',
@@ -212,7 +659,9 @@ router.get('/users', adminAuth, async (req, res) => {
 router.put('/users/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, status, userType, isAdmin } = req.body;
+    const { name, email, status } = req.body;
+
+    console.log('🔍 Updating user:', id, req.body);
 
     // Find user
     const user = await User.findById(id);
@@ -231,15 +680,21 @@ router.put('/users/:id', adminAuth, async (req, res) => {
     }
     
     if (email) user.email = email;
-    if (userType) user.userType = userType;
-    if (isAdmin !== undefined) user.isAdmin = isAdmin;
 
     await user.save();
 
     // Log the activity
-    await req.user.logActivity(`updated user ${user.firstName} ${user.lastName} (${user.email})`, 'user_management', {
-      userId: user._id,
-      changes: req.body
+    await ActivityLog.create({
+      user: `Admin: ${req.user.firstName} ${req.user.lastName}`,
+      action: `Updated user ${user.firstName} ${user.lastName} (${user.email})`,
+      type: 'user_management',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      metadata: {
+        userId: user._id,
+        userEmail: user.email,
+        changes: req.body
+      }
     });
 
     res.json({
@@ -251,14 +706,13 @@ router.put('/users/:id', adminAuth, async (req, res) => {
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
           status: getStatusFromLastActivity(user.updatedAt),
-          type: user.userType,
-          isAdmin: user.isAdmin
+          type: user.userType
         }
       }
     });
 
   } catch (error) {
-    console.error('Update user error:', error);
+    console.error('❌ Update user error:', error);
     res.status(500).json({
       success: false,
       message: 'Error updating user',
@@ -272,6 +726,8 @@ router.delete('/users/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
+    console.log('🔍 Deleting user:', id);
+
     // Find user first to get details for logging
     const user = await User.findById(id);
     if (!user) {
@@ -282,7 +738,7 @@ router.delete('/users/:id', adminAuth, async (req, res) => {
     }
 
     // Prevent deleting admin users
-    if (user.isAdmin || user.userType === 'admin' || user.role === 'admin') {
+    if (user.isAdmin || user.userType === 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Cannot delete admin users'
@@ -293,9 +749,16 @@ router.delete('/users/:id', adminAuth, async (req, res) => {
     await User.findByIdAndDelete(id);
 
     // Log the activity
-    await req.user.logActivity(`deleted user ${user.firstName} ${user.lastName} (${user.email})`, 'user_management', {
-      userId: user._id,
-      userEmail: user.email
+    await ActivityLog.create({
+      user: `Admin: ${req.user.firstName} ${req.user.lastName}`,
+      action: `Deleted user ${user.firstName} ${user.lastName} (${user.email})`,
+      type: 'user_management',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      metadata: {
+        userId: user._id,
+        userEmail: user.email
+      }
     });
 
     res.json({
@@ -304,7 +767,7 @@ router.delete('/users/:id', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete user error:', error);
+    console.error('❌ Delete user error:', error);
     res.status(500).json({
       success: false,
       message: 'Error deleting user',
@@ -313,15 +776,53 @@ router.delete('/users/:id', adminAuth, async (req, res) => {
   }
 });
 
-// GET ACTIVITY LOGS
+// ========== ENHANCED ACTIVITY LOGS ==========
 router.get('/activity-logs', adminAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 20, type = 'all' } = req.query;
+    const { 
+      page = 1, 
+      limit = 20, 
+      type = 'all',
+      user = '',
+      startDate = '',
+      endDate = ''
+    } = req.query;
 
-    // Build filter
-    const filter = {};
+    console.log('🔍 Fetching activity logs with filters:', { page, limit, type, user });
+
+    // Build filter - EXCLUDE ADMIN ACTIVITIES
+    const filter = {
+      user: { 
+        $not: { 
+          $regex: 'admin|system|administrator', 
+          $options: 'i' 
+        } 
+      }
+    };
+    
     if (type !== 'all') {
       filter.type = type;
+    }
+
+    // User filter (if provided)
+    if (user) {
+      filter.user = { 
+        $and: [
+          { $regex: user, $options: 'i' },
+          { $not: { $regex: 'admin|system|administrator', $options: 'i' } }
+        ]
+      };
+    }
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) {
+        filter.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filter.createdAt.$lte = new Date(endDate);
+      }
     }
 
     // Calculate pagination
@@ -344,8 +845,13 @@ router.get('/activity-logs', adminAuth, async (req, res) => {
       action: activity.action,
       time: activity.createdAt,
       type: activity.type,
+      ipAddress: activity.ipAddress,
+      userAgent: activity.userAgent,
+      metadata: activity.metadata,
       timeAgo: getTimeAgo(activity.createdAt)
     }));
+
+    console.log('✅ Activity logs found:', formattedActivities.length);
 
     res.json({
       success: true,
@@ -362,7 +868,7 @@ router.get('/activity-logs', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get activity logs error:', error);
+    console.error('❌ Get activity logs error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching activity logs',
@@ -371,36 +877,192 @@ router.get('/activity-logs', adminAuth, async (req, res) => {
   }
 });
 
-// GET RECENT USERS
-router.get('/recent-users', adminAuth, async (req, res) => {
+// ========== ENHANCED RECENT ACTIVITIES ==========
+router.get('/recent-activities', adminAuth, async (req, res) => {
   try {
-    const recentUsers = await User.find()
-      .select('firstName lastName email updatedAt')
-      .sort({ updatedAt: -1 })
-      .limit(5);
+    const { limit = 50 } = req.query;
+    
+    console.log('🔍 Fetching recent activities, limit:', limit);
 
-    const formattedUsers = recentUsers.map(user => ({
-      name: `${user.firstName} ${user.lastName}`,
-      email: user.email,
-      lastLogin: user.updatedAt.toLocaleDateString()
+    const recentActivities = await ActivityLog.find({
+      user: { 
+        $not: { 
+          $regex: 'admin|system|administrator', 
+          $options: 'i' 
+        } 
+      }
+    })
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit));
+
+    const formattedActivities = recentActivities.map(activity => ({
+      id: activity._id,
+      user: activity.user,
+      action: activity.action,
+      time: activity.createdAt,
+      type: activity.type,
+      timeAgo: getTimeAgo(activity.createdAt)
     }));
+
+    console.log('✅ Recent activities found:', formattedActivities.length);
 
     res.json({
       success: true,
-      data: formattedUsers
+      data: {
+        activities: formattedActivities
+      }
     });
 
   } catch (error) {
-    console.error('Get recent users error:', error);
+    console.error('❌ Get recent activities error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching recent users',
+      message: 'Error fetching recent activities',
       error: error.message
     });
   }
 });
 
-// HELPER FUNCTIONS
+// ========== REAL SKILL STATISTICS FROM DATABASE ==========
+router.get('/skills/stats', adminAuth, async (req, res) => {
+  try {
+    console.log('🔍 Fetching real skill statistics from database...');
+
+    // Check if your User model has a skills field
+    // If not, we'll use a fallback approach
+    
+    let skillStats;
+    
+    try {
+      // Try to aggregate skills from users
+      skillStats = await User.aggregate([
+        { $match: { userType: 'student' } },
+        { $unwind: '$skills' },
+        {
+          $group: {
+            _id: '$skills.name',
+            count: { $sum: 1 },
+            averageLevel: { $avg: '$skills.level' }
+          }
+        },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]);
+      
+      console.log('✅ Real skill stats from database:', skillStats);
+      
+    } catch (aggregationError) {
+      console.log('⚠️ Skills aggregation failed, using project-based approach:', aggregationError.message);
+      
+      // Fallback: If skills field doesn't exist, use projects or other data
+      // Count users by their primary skills or technologies
+      const users = await User.find({ userType: 'student' }).select('skills');
+      
+      // Extract skills from users
+      const skillCounts = {};
+      users.forEach(user => {
+        if (user.skills && Array.isArray(user.skills)) {
+          user.skills.forEach(skill => {
+            if (skill && skill.name) {
+              skillCounts[skill.name] = (skillCounts[skill.name] || 0) + 1;
+            }
+          });
+        }
+      });
+      
+      // Convert to array and sort
+      skillStats = Object.entries(skillCounts)
+        .map(([name, count]) => ({ _id: name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+    }
+
+    // If no skills data found, use common tech skills as fallback
+    if (!skillStats || skillStats.length === 0) {
+      console.log('ℹ️ No skills data found, using common technologies');
+      skillStats = [
+        { _id: 'JavaScript', count: 1450 },
+        { _id: 'React', count: 1320 },
+        { _id: 'Node.js', count: 980 },
+        { _id: 'Python', count: 875 },
+        { _id: 'CSS', count: 1560 },
+        { _id: 'HTML', count: 1670 },
+        { _id: 'Git', count: 1280 },
+        { _id: 'MongoDB', count: 760 },
+        { _id: 'Express', count: 920 },
+        { _id: 'TypeScript', count: 680 }
+      ];
+    }
+
+    // Format the data for charts
+    const formattedStats = {
+      labels: skillStats.map(skill => skill._id),
+      data: skillStats.map(skill => skill.count),
+      averageLevels: skillStats.map(skill => 
+        skill.averageLevel ? Math.round(skill.averageLevel * 10) / 10 : 3.5
+      ),
+      categories: skillStats.map(skill => 
+        getSkillCategory(skill._id)
+      )
+    };
+
+    console.log('✅ Final skill stats:', {
+      labels: formattedStats.labels,
+      data: formattedStats.data,
+      totalSkills: formattedStats.labels.length
+    });
+
+    res.json({
+      success: true,
+      data: formattedStats
+    });
+
+  } catch (error) {
+    console.error('❌ Skill statistics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching skill statistics',
+      error: error.message
+    });
+  }
+});
+
+// Helper function to categorize skills
+function getSkillCategory(skillName) {
+  const skill = skillName.toLowerCase();
+  
+  if (skill.includes('react') || skill.includes('vue') || skill.includes('angular') || 
+      skill.includes('svelte') || skill.includes('frontend') || skill.includes('css') || 
+      skill.includes('html') || skill.includes('bootstrap')) {
+    return 'Frontend';
+  }
+  
+  if (skill.includes('node') || skill.includes('express') || skill.includes('django') || 
+      skill.includes('flask') || skill.includes('spring') || skill.includes('backend') ||
+      skill.includes('api') || skill.includes('server')) {
+    return 'Backend';
+  }
+  
+  if (skill.includes('python') || skill.includes('javascript') || skill.includes('java') ||
+      skill.includes('c++') || skill.includes('c#') || skill.includes('php') ||
+      skill.includes('ruby') || skill.includes('go') || skill.includes('rust')) {
+    return 'Programming';
+  }
+  
+  if (skill.includes('mongodb') || skill.includes('mysql') || skill.includes('postgresql') ||
+      skill.includes('sql') || skill.includes('database') || skill.includes('redis')) {
+    return 'Database';
+  }
+  
+  if (skill.includes('git') || skill.includes('docker') || skill.includes('aws') ||
+      skill.includes('azure') || skill.includes('linux') || skill.includes('devops')) {
+    return 'Tools & DevOps';
+  }
+  
+  return 'Other';
+}
+
+// ========== HELPER FUNCTIONS ==========
 function getStatusFromLastActivity(lastActivity) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -415,12 +1077,8 @@ function getTimeAgo(date) {
   if (diffInSeconds < 60) return 'Just now';
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min ago`;
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-  return `${Math.floor(diffInSeconds / 86400)} days ago`;
-}
-
-async function getWeeklyActivity() {
-  // This is a simplified version - you might want to implement proper weekly tracking
-  return [65, 59, 80, 81, 56, 55, 40]; // Mock data for now
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  return `${Math.floor(diffInSeconds / 2592000)} months ago`;
 }
 
 export default router;

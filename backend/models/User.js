@@ -200,6 +200,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    
     skills: [skillSchema],
     projectHistory: [projectSchema],
     recommendations: [recommendationSchema],
@@ -207,7 +208,6 @@ const userSchema = new mongoose.Schema(
       type: settingsSchema,
       default: () => ({}),
     },
-    // ADD ADMIN FIELDS HERE
     userType: {
       type: String,
       enum: ['student', 'instructor', 'admin'],
