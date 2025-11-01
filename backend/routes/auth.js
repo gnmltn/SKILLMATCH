@@ -319,6 +319,22 @@ router.post("/login/verify-otp", async (req, res) => {
 
     console.log("LOGIN SUCCESSFUL for user:", user._id);
     
+    // Log user login activity
+    try {
+      await user.logActivity(
+        `Logged in successfully via OTP`,
+        'login',
+        {
+          ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'N/A',
+          userAgent: req.get('User-Agent') || 'N/A',
+          loginMethod: 'OTP'
+        }
+      );
+    } catch (activityError) {
+      console.error('Failed to log login activity:', activityError);
+      // Don't fail the login if activity logging fails
+    }
+    
     // Prepare response data
     const responseData = {
       success: true,
@@ -619,6 +635,22 @@ router.post("/google", async (req, res) => {
     // Generate token for Google user
     const token = generateToken(user._id);
 
+    // Log user login activity for Google login
+    try {
+      await user.logActivity(
+        `Logged in successfully via Google`,
+        'login',
+        {
+          ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'N/A',
+          userAgent: req.get('User-Agent') || 'N/A',
+          loginMethod: 'Google OAuth'
+        }
+      );
+    } catch (activityError) {
+      console.error('Failed to log Google login activity:', activityError);
+      // Don't fail the login if activity logging fails
+    }
+
     res.status(200).json({
       success: true,
       message: "Google login successful",
@@ -845,4 +877,64 @@ router.post("/verify-email-setup", async (req, res) => {
     });
   }
 });
+
+// Logout endpoint - logs user logout activity
+router.post("/logout", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const { reason } = req.body || {};
+    
+    if (!token) {
+      // If no token, just return success (client-side logout)
+      return res.status(200).json({
+        success: true,
+        message: "Logged out successfully"
+      });
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+      const user = await User.findById(decoded.id);
+      
+      if (user) {
+        // Log user logout activity
+        try {
+          const logoutReason = reason === 'inactivity' ? 'Session expired due to inactivity' : 'Logged out successfully';
+          const logoutMethod = reason === 'inactivity' ? 'inactivity' : 'manual';
+          
+          await user.logActivity(
+            logoutReason,
+            'logout',
+            {
+              ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'N/A',
+              userAgent: req.get('User-Agent') || 'N/A',
+              logoutMethod: logoutMethod,
+              reason: reason || 'manual'
+            }
+          );
+        } catch (activityError) {
+          console.error('Failed to log logout activity:', activityError);
+          // Don't fail the logout if activity logging fails
+        }
+      }
+    } catch (tokenError) {
+      // Invalid or expired token - still allow logout
+      console.log('Logout with invalid token:', tokenError.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged out successfully"
+    });
+
+  } catch (error) {
+    console.error("LOGOUT ERROR:", error);
+    // Even if there's an error, return success so client can clear localStorage
+    return res.status(200).json({
+      success: true,
+      message: "Logged out successfully"
+    });
+  }
+});
+
 export default router;

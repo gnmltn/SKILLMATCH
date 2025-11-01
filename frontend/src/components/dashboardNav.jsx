@@ -50,8 +50,27 @@ export default function DashboardNav({
   const profilePopupRef = useRef(null);
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const token = localStorage.getItem('token');
+    
+    // Call logout API to log activity
+    if (token) {
+      try {
+        await fetch('http://localhost:5000/api/users/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (error) {
+        console.error('Failed to call logout endpoint:', error);
+        // Continue with logout even if API call fails
+      }
+    }
+    
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     toast.success('Logged out successfully!');
     navigate('/');
   };

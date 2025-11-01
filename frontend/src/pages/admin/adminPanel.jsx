@@ -64,7 +64,8 @@ import logo from "../../assets/logo.png";
 const API_BASE = '/api/admin';
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+  // Use adminToken for admin panel to avoid conflicts with student sessions
+  const token = localStorage.getItem('adminToken');
   if (!token) {
     console.error('❌ No authentication token found');
     throw new Error('No authentication token found');
@@ -80,7 +81,8 @@ const apiCall = async (url, options = {}) => {
   try {
     console.log(`🔄 API Call: ${url}`, options);
     
-    const token = localStorage.getItem('token');
+    // Use adminToken for admin panel API calls to avoid conflicts with student sessions
+    const token = localStorage.getItem('adminToken');
     if (!token) {
       console.error('❌ No authentication token found');
       throw new Error('No authentication token found');
@@ -108,8 +110,9 @@ const apiCall = async (url, options = {}) => {
 
     if (response.status === 401 || response.status === 403) {
       console.error('❌ Authentication failed, redirecting to login');
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      // Only clear admin-specific keys, not student keys
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUser');
       localStorage.removeItem('isAdmin');
       window.location.href = '/admin/adminLogin';
       throw new Error('Authentication failed. Please login again.');
@@ -327,8 +330,9 @@ const Sidebar = ({ activePage, setActivePage, adminUser }) => {
 
   const handleLogout = () => {
     console.log('🚪 Logging out...');
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    // Only clear admin-specific keys, not student keys
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
     localStorage.removeItem('isAdmin');
     toast.success('Logged out successfully');
     window.location.href = '/admin/adminLogin';
@@ -2046,10 +2050,10 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
       // Update user state with response from API
       setUser(response);
       
-      // Update localStorage
-      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      // Update localStorage (use adminUser for admin sessions)
+      const storedUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
       const updatedStoredUser = { ...storedUser, ...response };
-      localStorage.setItem('user', JSON.stringify(updatedStoredUser));
+      localStorage.setItem('adminUser', JSON.stringify(updatedStoredUser));
       
       toast.success('Profile picture updated successfully!');
       
@@ -2080,10 +2084,10 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
       setProfilePicture(null);
       setProfilePreview('');
       
-      // Update localStorage
-      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      // Update localStorage (use adminUser for admin sessions)
+      const storedUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
       const updatedStoredUser = { ...storedUser, ...response };
-      localStorage.setItem('user', JSON.stringify(updatedStoredUser));
+      localStorage.setItem('adminUser', JSON.stringify(updatedStoredUser));
       
       // Reset file input
       if (fileInputRef.current) {
@@ -2187,10 +2191,10 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
       // Update user state with response from API
       setUser(response);
       
-      // Update localStorage
-      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      // Update localStorage (use adminUser for admin sessions)
+      const storedUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
       const updatedStoredUser = { ...storedUser, ...response };
-      localStorage.setItem('user', JSON.stringify(updatedStoredUser));
+      localStorage.setItem('adminUser', JSON.stringify(updatedStoredUser));
       
       toast.success('Profile updated successfully!');
       
@@ -2730,8 +2734,8 @@ const AdminPanel = () => {
     try {
       console.log('🔄 Loading admin profile...');
       
-      // Try to get from localStorage first
-      const storedUser = localStorage.getItem('user');
+      // Try to get from localStorage first (use adminUser for admin sessions)
+      const storedUser = localStorage.getItem('adminUser');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         console.log('📁 Loaded user from localStorage:', userData);
@@ -2743,7 +2747,7 @@ const AdminPanel = () => {
         const profile = await fetchAdminProfileData();
         console.log('🌐 Loaded user from API:', profile);
         setAdminUser(profile);
-        localStorage.setItem('user', JSON.stringify(profile));
+        localStorage.setItem('adminUser', JSON.stringify(profile));
       } catch (apiError) {
         console.warn('⚠️ Could not fetch admin profile from API, using stored data:', apiError);
         // Continue with stored data
@@ -2763,8 +2767,9 @@ const AdminPanel = () => {
   useEffect(() => {
     const checkAuth = async () => {
       console.log('🔐 Checking authentication...');
-      const token = localStorage.getItem('token');
-      const user = localStorage.getItem('user');
+      // Use admin-specific keys to avoid conflicts with student sessions
+      const token = localStorage.getItem('adminToken');
+      const user = localStorage.getItem('adminUser');
       
       console.log('🔐 Token exists:', !!token);
       console.log('🔐 User exists:', !!user);

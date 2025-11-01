@@ -20,38 +20,60 @@ export default function InactivityTracker() {
   const timeoutRef = useRef(null);
   const lastActivityRef = useRef(Date.now());
   const locationRef = useRef(location.pathname);
+  const isAdminRouteRef = useRef(false);
 
   // Update location ref when it changes
   useEffect(() => {
     locationRef.current = location.pathname;
+    isAdminRouteRef.current = location.pathname.includes('/admin');
   }, [location.pathname]);
 
   useEffect(() => {
     let isActive = true;
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
       if (!isActive) return;
       
       const currentPath = locationRef.current;
-      const isAdmin = localStorage.getItem('isAdmin') === 'true' || 
-                      currentPath.includes('/admin');
+      const isAdmin = isAdminRouteRef.current || 
+                      localStorage.getItem('isAdmin') === 'true';
 
       console.log('🚪 Auto-logout triggered due to inactivity');
-      
-      // Clear all authentication data
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('isAdmin');
 
-      // Show logout message
-      toast.warning('Session expired due to inactivity', {
-        description: 'You have been automatically logged out.',
-      });
-
-      // Redirect based on user type
+      // Clear only the appropriate authentication data based on route
       if (isAdmin) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminUser');
+        localStorage.removeItem('isAdmin');
+        toast.warning('Session expired due to inactivity', {
+          description: 'You have been automatically logged out.',
+        });
         window.location.href = '/admin/adminLogin';
       } else {
+        const token = localStorage.getItem('token');
+        
+        // Call logout API to log inactivity logout activity
+        if (token) {
+          try {
+            await fetch('http://localhost:5000/api/users/logout', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ reason: 'inactivity' })
+            });
+          } catch (error) {
+            console.error('Failed to call logout endpoint:', error);
+            // Continue with logout even if API call fails
+          }
+        }
+        
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        toast.warning('Session expired due to inactivity', {
+          description: 'You have been automatically logged out.',
+        });
         navigate('/');
       }
     };
@@ -63,15 +85,21 @@ export default function InactivityTracker() {
         timeoutRef.current = null;
       }
 
-      // Check if user is logged in
-      const token = localStorage.getItem('token');
+      // Check if user is logged in - use appropriate token based on route
+      const currentPath = locationRef.current;
+      const isAdmin = isAdminRouteRef.current;
+      
+      // Use adminToken for admin routes, token for student routes
+      const token = isAdmin 
+        ? localStorage.getItem('adminToken')
+        : localStorage.getItem('token');
+        
       if (!token) {
         console.log('⏸️ No token found, stopping inactivity tracking');
         return; // No need to track if not logged in
       }
 
       // Check if user is on a public route
-      const currentPath = locationRef.current;
       const isPublicRoute = PUBLIC_ROUTES.some(route => {
         // Exact match for root path
         if (route === '/') {
@@ -86,7 +114,7 @@ export default function InactivityTracker() {
         return; // Don't track inactivity on public routes
       }
 
-      console.log('✅ Tracking inactivity on protected route:', currentPath);
+      console.log('✅ Tracking inactivity on protected route:', currentPath, isAdmin ? '(Admin)' : '(Student)');
 
       // Update last activity time
       lastActivityRef.current = Date.now();
@@ -109,7 +137,11 @@ export default function InactivityTracker() {
       // Only process activity if at least 1 second has passed since last activity
       // This prevents rapid-fire resets
       if (timeSinceLastActivity >= 1000) {
-        const token = localStorage.getItem('token');
+        const isAdmin = isAdminRouteRef.current;
+        // Use adminToken for admin routes, token for student routes
+        const token = isAdmin 
+          ? localStorage.getItem('adminToken')
+          : localStorage.getItem('token');
         if (token) {
           resetTimer();
         }
@@ -135,9 +167,44 @@ export default function InactivityTracker() {
     // Initialize timer if user is logged in
     resetTimer();
 
+    // Listen for storage changes from other tabs (but don't auto-logout on storage events)
+    // This allows tabs to coexist without interfering with each other
+    const handleStorageChange = (e) => {
+      if (!isActive) return;
+      
+      // Only react if our own token was removed by another tab
+      const currentPath = locationRef.current;
+      const isAdmin = isAdminRouteRef.current;
+      
+      if (isAdmin && (e.key === 'adminToken' || e.key === null)) {
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+          // Token was removed by another tab, reset timer to stop tracking
+          console.log('🔔 Admin token removed in another tab, stopping inactivity tracking');
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+        }
+      } else if (!isAdmin && (e.key === 'token' || e.key === null)) {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          // Token was removed by another tab, reset timer to stop tracking
+          console.log('🔔 Student token removed in another tab, stopping inactivity tracking');
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
     // Cleanup function
     return () => {
       isActive = false;
+      window.removeEventListener('storage', handleStorageChange);
       events.forEach(event => {
         document.removeEventListener(event, handleActivity, { capture: true });
       });

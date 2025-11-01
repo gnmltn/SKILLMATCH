@@ -790,28 +790,59 @@ router.get('/activity-logs', adminAuth, async (req, res) => {
 
     console.log('🔍 Fetching activity logs with filters:', { page, limit, type, user });
 
-    // Build filter - EXCLUDE ADMIN ACTIVITIES
-    const filter = {
-      user: { 
-        $not: { 
-          $regex: 'admin|system|administrator', 
-          $options: 'i' 
-        } 
+    // Build base filter - EXCLUDE ADMIN ACTIVITIES
+    const baseUserFilter = {
+      $not: { 
+        $regex: 'admin|system|administrator', 
+        $options: 'i' 
       }
     };
+
+    // Build filter object
+    const filter = {
+      user: baseUserFilter
+    };
     
+    // Type filter
     if (type !== 'all') {
-      filter.type = type;
+      // Special handling for skill filter - match by action content since skills use 'system' type
+      if (type === 'skill') {
+        filter.$and = [
+          {
+            $or: [
+              { type: 'skill' },
+              { 
+                type: 'system',
+                action: { 
+                  $regex: '(Added skill|Updated skill|Deleted skill)', 
+                  $options: 'i' 
+                }
+              }
+            ]
+          },
+          { user: baseUserFilter }
+        ];
+        delete filter.user; // Remove standalone user filter since it's now in $and
+      } else {
+        filter.type = type;
+      }
     }
 
     // User filter (if provided)
     if (user) {
-      filter.user = { 
+      const userSearchFilter = {
         $and: [
           { $regex: user, $options: 'i' },
           { $not: { $regex: 'admin|system|administrator', $options: 'i' } }
         ]
       };
+
+      // If we have $and already (from skill filter), add user filter to it
+      if (filter.$and) {
+        filter.$and.push({ user: userSearchFilter });
+      } else {
+        filter.user = userSearchFilter;
+      }
     }
 
     // Date range filter

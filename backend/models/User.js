@@ -353,6 +353,35 @@ userSchema.methods.toJSON = function () {
   return obj;
 };
 
+// Add activity logging method for users
+userSchema.methods.logActivity = async function (action, type = 'system', metadata = {}) {
+  try {
+    const ActivityLog = mongoose.model('ActivityLog');
+    
+    // Use full name or email for user identification
+    const userName = `${this.firstName} ${this.lastName}`.trim() || this.email;
+    
+    const activity = new ActivityLog({
+      user: userName,
+      action,
+      type,
+      ipAddress: metadata.ipAddress || 'N/A',
+      userAgent: metadata.userAgent || 'N/A',
+      metadata: {
+        ...metadata,
+        userId: this._id.toString(),
+        userEmail: this.email
+      }
+    });
+    
+    await activity.save();
+    return activity;
+  } catch (error) {
+    console.error('User activity logging error:', error);
+    // Don't throw - activity logging shouldn't break the main flow
+  }
+};
+
 const User = mongoose.model("User", userSchema);
 
 export default User;

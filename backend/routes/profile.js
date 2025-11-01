@@ -235,6 +235,25 @@ router.post("/skills", protect, async (req, res) => {
     const addedSkill = user.skills[user.skills.length - 1];
     console.log("Skill added successfully:", addedSkill);
 
+    // Log skill addition activity
+    try {
+      await user.logActivity(
+        `Added skill: ${newSkill.name} (Level ${newSkill.level}, Category: ${newSkill.category})`,
+        'system',
+        {
+          ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'N/A',
+          userAgent: req.get('User-Agent') || 'N/A',
+          skillName: newSkill.name,
+          skillLevel: newSkill.level,
+          skillCategory: newSkill.category,
+          skillId: addedSkill._id.toString()
+        }
+      );
+    } catch (activityError) {
+      console.error('Failed to log skill addition activity:', activityError);
+      // Don't fail the skill addition if activity logging fails
+    }
+
     return res.status(201).json({
       success: true,
       message: "Skill added successfully",
@@ -265,10 +284,45 @@ router.patch("/skills/:skillId", protect, async (req, res) => {
       return res.status(404).json({ message: "Skill not found" });
     }
 
+    const oldLevel = skill.level;
+    const oldName = skill.name;
+    
     if (level !== undefined) skill.level = level;
     if (name !== undefined) skill.name = name;
 
     await user.save();
+
+    // Log skill update activity
+    try {
+      const updateDetails = [];
+      if (level !== undefined && level !== oldLevel) {
+        updateDetails.push(`Level: ${oldLevel} → ${level}`);
+      }
+      if (name !== undefined && name !== oldName) {
+        updateDetails.push(`Name: ${oldName} → ${name}`);
+      }
+      
+      if (updateDetails.length > 0) {
+        await user.logActivity(
+          `Updated skill: ${skill.name} (${updateDetails.join(', ')})`,
+          'system',
+          {
+            ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'N/A',
+            userAgent: req.get('User-Agent') || 'N/A',
+            skillName: skill.name,
+            skillLevel: skill.level,
+            skillId: skill._id.toString(),
+            oldLevel,
+            oldName,
+            newLevel: skill.level,
+            newName: skill.name
+          }
+        );
+      }
+    } catch (activityError) {
+      console.error('Failed to log skill update activity:', activityError);
+      // Don't fail the skill update if activity logging fails
+    }
 
     return res.status(200).json({
       success: true,
@@ -287,7 +341,25 @@ router.delete("/skills/:skillId", protect, async (req, res) => {
 
     console.log("DELETE Request - Skill ID:", skillId, "User ID:", userId);
 
-    // Alternative approach using findByIdAndUpdate
+    // Get user and skill info BEFORE deletion (for logging)
+    const userBeforeDelete = await User.findById(userId);
+    if (!userBeforeDelete) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const skillToDelete = userBeforeDelete.skills.id(skillId);
+    if (!skillToDelete) {
+      return res.status(404).json({ message: "Skill not found" });
+    }
+
+    // Store skill details for logging
+    const deletedSkillInfo = {
+      name: skillToDelete.name,
+      level: skillToDelete.level,
+      category: skillToDelete.category
+    };
+
+    // Delete the skill
     const result = await User.findByIdAndUpdate(
       userId,
       { $pull: { skills: { _id: skillId } } },
@@ -302,6 +374,25 @@ router.delete("/skills/:skillId", protect, async (req, res) => {
     const skillStillExists = result.skills.some(skill => skill._id.toString() === skillId);
     if (skillStillExists) {
       return res.status(404).json({ message: "Skill not found" });
+    }
+
+    // Log skill deletion activity
+    try {
+      await userBeforeDelete.logActivity(
+        `Deleted skill: ${deletedSkillInfo.name} (Level ${deletedSkillInfo.level}, Category: ${deletedSkillInfo.category})`,
+        'system',
+        {
+          ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'N/A',
+          userAgent: req.get('User-Agent') || 'N/A',
+          skillName: deletedSkillInfo.name,
+          skillLevel: deletedSkillInfo.level,
+          skillCategory: deletedSkillInfo.category,
+          skillId: skillId
+        }
+      );
+    } catch (activityError) {
+      console.error('Failed to log skill deletion activity:', activityError);
+      // Don't fail the skill deletion if activity logging fails
     }
 
     return res.status(200).json({

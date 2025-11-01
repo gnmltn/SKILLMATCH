@@ -36,7 +36,8 @@ export default function AdminLogin() {
       if (response.data.success) {
         const { token, user } = response.data;
         
-        localStorage.setItem('token', token);
+        // Use separate localStorage keys for admin to avoid conflicts with student sessions
+        localStorage.setItem('adminToken', token);
         // Store minimal user data to avoid localStorage quota issues
         const minimalUserData = {
           _id: user._id,
@@ -50,10 +51,10 @@ export default function AdminLogin() {
         };
         
         try {
-          localStorage.setItem('user', JSON.stringify(minimalUserData));
+          localStorage.setItem('adminUser', JSON.stringify(minimalUserData));
         } catch (storageError) {
           console.error('Failed to store user data:', storageError);
-          localStorage.setItem('user', JSON.stringify({ _id: user._id, email: user.email, isAdmin: true }));
+          localStorage.setItem('adminUser', JSON.stringify({ _id: user._id, email: user.email, isAdmin: true }));
         }
         
         localStorage.setItem('isAdmin', 'true');
