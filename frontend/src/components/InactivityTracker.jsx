@@ -87,7 +87,7 @@ export default function InactivityTracker() {
 
       // Check if user is logged in - use appropriate token based on route
       const currentPath = locationRef.current;
-      const isAdmin = isAdminRouteRef.current;
+      const isAdmin = isAdminRouteRef.current || localStorage.getItem('isAdmin') === 'true';
       
       // Use adminToken for admin routes, token for student routes
       const token = isAdmin 
@@ -97,6 +97,12 @@ export default function InactivityTracker() {
       if (!token) {
         console.log('⏸️ No token found, stopping inactivity tracking');
         return; // No need to track if not logged in
+      }
+
+      // Only track inactivity for admin users - regular users don't need automatic logout
+      if (!isAdmin) {
+        console.log('⏸️ Regular user session - inactivity tracking disabled');
+        return; // Don't track inactivity for regular users
       }
 
       // Check if user is on a public route
@@ -114,7 +120,7 @@ export default function InactivityTracker() {
         return; // Don't track inactivity on public routes
       }
 
-      console.log('✅ Tracking inactivity on protected route:', currentPath, isAdmin ? '(Admin)' : '(Student)');
+      console.log('✅ Tracking inactivity on protected route:', currentPath, '(Admin)');
 
       // Update last activity time
       lastActivityRef.current = Date.now();
@@ -137,13 +143,13 @@ export default function InactivityTracker() {
       // Only process activity if at least 1 second has passed since last activity
       // This prevents rapid-fire resets
       if (timeSinceLastActivity >= 1000) {
-        const isAdmin = isAdminRouteRef.current;
-        // Use adminToken for admin routes, token for student routes
-        const token = isAdmin 
-          ? localStorage.getItem('adminToken')
-          : localStorage.getItem('token');
-        if (token) {
-          resetTimer();
+        const isAdmin = isAdminRouteRef.current || localStorage.getItem('isAdmin') === 'true';
+        // Only track activity for admin users
+        if (isAdmin) {
+          const token = localStorage.getItem('adminToken');
+          if (token) {
+            resetTimer();
+          }
         }
       }
     };
@@ -169,12 +175,12 @@ export default function InactivityTracker() {
 
     // Listen for storage changes from other tabs (but don't auto-logout on storage events)
     // This allows tabs to coexist without interfering with each other
+    // Only track for admin users
     const handleStorageChange = (e) => {
       if (!isActive) return;
       
-      // Only react if our own token was removed by another tab
-      const currentPath = locationRef.current;
-      const isAdmin = isAdminRouteRef.current;
+      // Only react if admin token was removed by another tab
+      const isAdmin = isAdminRouteRef.current || localStorage.getItem('isAdmin') === 'true';
       
       if (isAdmin && (e.key === 'adminToken' || e.key === null)) {
         const token = localStorage.getItem('adminToken');
@@ -186,17 +192,8 @@ export default function InactivityTracker() {
             timeoutRef.current = null;
           }
         }
-      } else if (!isAdmin && (e.key === 'token' || e.key === null)) {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          // Token was removed by another tab, reset timer to stop tracking
-          console.log('🔔 Student token removed in another tab, stopping inactivity tracking');
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-          }
-        }
       }
+      // Regular users don't need to track storage changes for inactivity
     };
 
     window.addEventListener('storage', handleStorageChange);

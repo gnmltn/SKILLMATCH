@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from "../../contexts/ThemeContext";
@@ -16,6 +16,21 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
+
+  // Redirect regular users to dashboard - they shouldn't access admin login
+  useEffect(() => {
+    const regularToken = localStorage.getItem('token');
+    const adminToken = localStorage.getItem('adminToken');
+    
+    // If regular user is logged in (but not admin), redirect to dashboard
+    if (regularToken && !adminToken) {
+      navigate('/dashboard', { replace: true });
+    }
+    // If admin is already logged in, redirect to admin panel
+    else if (adminToken) {
+      navigate('/admin/adminPanel', { replace: true });
+    }
+  }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

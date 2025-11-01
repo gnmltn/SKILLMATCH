@@ -394,7 +394,7 @@ export default function CareerPath() {
                 {topMatch.matchPercentage}%
               </div>
               <p className={mutedTextClass}>Match Score</p>
-              <span className={`text-xs px-2 py-1 rounded-full ${getQualifiedBadge(topMatch.qualifies, isDarkMode)}`}>
+              <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap inline-block ${getQualifiedBadge(topMatch.qualifies, isDarkMode)}`}>
                 {topMatch.qualifies ? 'Qualified ✓' : 'Needs Improvement'}
               </span>
             </div>
@@ -561,7 +561,7 @@ export default function CareerPath() {
                       {career.matchPercentage}%
                     </div>
                     <p className={mutedTextClass}>Match</p>
-                    <span className={`text-xs px-2 py-1 rounded-full ${getQualifiedBadge(career.qualifies, isDarkMode)}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap inline-block ${getQualifiedBadge(career.qualifies, isDarkMode)}`}>
                       {career.qualifies ? 'Qualified ✓' : 'In Progress'}
                     </span>
                   </div>

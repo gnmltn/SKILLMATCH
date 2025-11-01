@@ -120,10 +120,6 @@ export default function DashboardNav({
 
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-4">
-            <Link to="/settings" className="text-muted-foreground hover:text-secondary transition-colors">
-              <Settings size={18} />
-            </Link>
-            
             <div className="relative" ref={profilePopupRef}>
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}

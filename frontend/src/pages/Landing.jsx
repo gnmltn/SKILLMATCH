@@ -1,5 +1,6 @@
 import { Users, Lightbulb, GraduationCap } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 import logo from '../assets/logo.png';
@@ -11,8 +12,17 @@ import target from '../assets/target_icon.png';
 import check from '../assets/check.png';
 
 const Landing = () => {
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { isDarkMode } = useTheme();
+
+  // Redirect logged-in users to dashboard
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [navigate]);
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);

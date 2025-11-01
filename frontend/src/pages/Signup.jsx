@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, CheckCircle, Eye, EyeOff, Menu, Mail } from 'lucide-react';
 import logo from '../assets/logo.png';
@@ -27,6 +27,14 @@ const Signup = () => {
   const [otpError, setOtpError] = useState('');
   const [isVerifyingOTP, setIsVerifyingOTP] = useState(false);
   const [tempEmail, setTempEmail] = useState('');
+
+  // Redirect logged-in users to dashboard
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [navigate]);
 
   const validateFirstName = (value) => /^[a-zA-Z\s]*$/.test(value);
   const validateLastName = (value) => /^[a-zA-Z\s]*$/.test(value);

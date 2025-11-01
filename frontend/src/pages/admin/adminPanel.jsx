@@ -2767,6 +2767,17 @@ const AdminPanel = () => {
   useEffect(() => {
     const checkAuth = async () => {
       console.log('🔐 Checking authentication...');
+      
+      // First check: if regular user is logged in (but not admin), redirect to dashboard
+      const regularToken = localStorage.getItem('token');
+      const adminToken = localStorage.getItem('adminToken');
+      
+      if (regularToken && !adminToken) {
+        console.log('❌ Regular user detected, redirecting to dashboard');
+        navigate('/dashboard', { replace: true });
+        return;
+      }
+      
       // Use admin-specific keys to avoid conflicts with student sessions
       const token = localStorage.getItem('adminToken');
       const user = localStorage.getItem('adminUser');
