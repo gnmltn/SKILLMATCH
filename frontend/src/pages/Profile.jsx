@@ -49,6 +49,7 @@ export default function Profile() {
   const [selectedCategory, setSelectedCategory] = useState('PROGRAMMING');
   const [selectedSkill, setSelectedSkill] = useState('');
   const [assessmentData, setAssessmentData] = useState(null);
+  const [editingSkillId, setEditingSkillId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -172,30 +173,85 @@ export default function Profile() {
     setShowSkillAssessment(true);
   };
 
+  const handleEditSkill = (skill) => {
+    // Set the category and skill name for the assessment
+    setSelectedCategory(skill.category);
+    setSelectedSkill(skill.name);
+    setEditingSkillId(skill._id);
+
+    // Get the assessment data for this skill
+    const skillActivities = skillAssessmentData[skill.category]?.[skill.name];
+    if (!skillActivities) {
+      toast.error('No assessment data found for this skill');
+      return;
+    }
+
+    // Initialize assessment with all activities unchecked (user will redo the assessment)
+    setAssessmentData({
+      category: skill.category,
+      skill: skill.name,
+      activities: {
+        BEGINNER: skillActivities.BEGINNER.map((activity) => ({ text: activity, checked: false })),
+        INTERMEDIATE: skillActivities.INTERMEDIATE.map((activity) => ({ text: activity, checked: false })),
+        EXPERT: skillActivities.EXPERT.map((activity) => ({ text: activity, checked: false })),
+      },
+    });
+    setShowSkillAssessment(true);
+  };
+
   const handleCompleteAssessment = async (proficiencyLevel) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(
-        `${API_BASE_URL}/profile/skills`,
-        { name: selectedSkill, level: proficiencyLevel, category: selectedCategory },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      
+      if (editingSkillId) {
+        // Update existing skill
+        const response = await axios.patch(
+          `${API_BASE_URL}/profile/skills/${editingSkillId}`,
+          { level: proficiencyLevel },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
 
-      setSkills([...skills, response.data.skill]);
+        // Update the skill in local state
+        setSkills(prevSkills => 
+          prevSkills.map(skill => 
+            skill._id === editingSkillId 
+              ? { ...skill, level: proficiencyLevel }
+              : skill
+          )
+        );
 
-      const suggestionsResponse = await axios.get(SUGGESTIONS_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setRecommendations(suggestionsResponse.data.recommendations || []);
+        const suggestionsResponse = await axios.get(SUGGESTIONS_URL, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setRecommendations(suggestionsResponse.data.recommendations || []);
 
-      toast.success(`${selectedSkill} added at ${proficiencyLevel}% proficiency!`);
+        toast.success(`${selectedSkill} updated to ${proficiencyLevel}% proficiency!`);
+        setEditingSkillId(null);
+      } else {
+        // Add new skill
+        const response = await axios.post(
+          `${API_BASE_URL}/profile/skills`,
+          { name: selectedSkill, level: proficiencyLevel, category: selectedCategory },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        setSkills([...skills, response.data.skill]);
+
+        const suggestionsResponse = await axios.get(SUGGESTIONS_URL, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setRecommendations(suggestionsResponse.data.recommendations || []);
+
+        toast.success(`${selectedSkill} added at ${proficiencyLevel}% proficiency!`);
+      }
+
       setShowSkillAssessment(false);
       setShowAddSkill(false);
       setSelectedSkill('');
       setAssessmentData(null);
     } catch (err) {
-      console.error('Error adding skill:', err);
-      toast.error(err.response?.data?.message || 'Failed to add skill');
+      console.error('Error saving skill:', err);
+      toast.error(err.response?.data?.message || 'Failed to save skill');
     }
   };
 
@@ -424,7 +480,12 @@ export default function Profile() {
                       </div>
                       <div className="space-y-4">
                         {categorySkills.map((skill) => (
-                          <SkillRow key={skill._id} skill={skill} onDelete={() => handleDeleteSkill(skill._id)} />
+                          <SkillRow 
+                            key={skill._id} 
+                            skill={skill} 
+                            onDelete={() => handleDeleteSkill(skill._id)}
+                            onEdit={() => handleEditSkill(skill)}
+                          />
                         ))}
                       </div>
                     </div>
@@ -572,6 +633,7 @@ export default function Profile() {
             setAssessmentData(null);
             setSelectedSkill('');
             setShowAddSkill(false);
+            setEditingSkillId(null);
           }}
           onComplete={handleCompleteAssessment}
         />
@@ -603,7 +665,7 @@ function Tab({ children, active, onClick }) {
   );
 }
 
-function SkillRow({ skill, onDelete }) {
+function SkillRow({ skill, onDelete, onEdit }) {
   const getProgressColor = (level) => {
     if (level <= 25) return 'bg-red-500';
     if (level <= 50) return 'bg-orange-500';
@@ -631,12 +693,21 @@ function SkillRow({ skill, onDelete }) {
         </div>
         <div className="flex items-center gap-2">
           <div className="text-sm font-semibold text-muted-foreground">{skill.level}%</div>
-          <button
-            onClick={onDelete}
-            className="opacity-0 group-hover:opacity-100 text-xs text-destructive hover:text-destructive/80 transition-opacity"
-          >
-            Delete
-          </button>
+          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={onEdit}
+              className="text-xs text-primary hover:text-primary/80 transition-colors"
+            >
+              Edit
+            </button>
+            <span className="text-muted-foreground">|</span>
+            <button
+              onClick={onDelete}
+              className="text-xs text-destructive hover:text-destructive/80 transition-colors"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
       <div className="w-full bg-muted rounded-full h-2">
