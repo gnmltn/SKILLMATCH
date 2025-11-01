@@ -204,7 +204,7 @@ export default function Suggestions() {
         <div className="mb-8">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-foreground mb-4">
-              9 AI Recommendations for You
+              AI Recommendations for You
             </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Based on your current skills and project roles, we've identified these growth opportunities
