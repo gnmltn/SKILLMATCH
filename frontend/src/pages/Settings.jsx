@@ -114,7 +114,7 @@ export default function Settings() {
           </div>
           
           <div className="px-6 pt-6">
-            <div className="grid grid-cols-4 bg-muted rounded-full p-1 w-full gap-1">
+            <div className="grid grid-cols-3 bg-muted rounded-full p-1 w-full gap-1">
               <SettingsTab active={activeTab === 'account'} onClick={() => setActiveTab('account')}>
                 Account
               </SettingsTab>
@@ -123,9 +123,6 @@ export default function Settings() {
               </SettingsTab>
               <SettingsTab active={activeTab === 'notifications'} onClick={() => setActiveTab('notifications')}>
                 Notifications
-              </SettingsTab>
-              <SettingsTab active={activeTab === 'privacy'} onClick={() => setActiveTab('privacy')}>
-                Privacy
               </SettingsTab>
             </div>
           </div>
@@ -150,13 +147,6 @@ export default function Settings() {
             )}
             {activeTab === 'notifications' && (
               <NotificationSettings 
-                user={user}
-                setUser={setUser}
-                getAuthHeaders={getAuthHeaders}
-              />
-            )}
-            {activeTab === 'privacy' && (
-              <PrivacySettings 
                 user={user}
                 setUser={setUser}
                 getAuthHeaders={getAuthHeaders}
@@ -623,176 +613,6 @@ function NotificationSettings({ user, setUser, getAuthHeaders }) {
             className="bg-primary text-primary-foreground py-2.5 px-6 rounded-lg hover:bg-primary/90 hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Saving...' : 'Save Preferences'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PrivacySettings({ user, setUser, getAuthHeaders }) {
-  const [privacy, setPrivacy] = useState({
-    profileVisible: user.settings?.privacy?.profileVisible ?? true,
-    skillsVisible: user.settings?.privacy?.skillsVisible ?? true,
-    projectsVisible: user.settings?.privacy?.projectsVisible ?? true,
-  });
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleToggle = (key) => {
-    setPrivacy(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
-
-  const handleSave = async () => {
-    try {
-      setIsLoading(true);
-      const res = await fetch(`${API_BASE}/settings/privacy`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(privacy),
-      });
-
-      if (!res.ok) throw new Error('Failed to update privacy settings');
-      
-      const updatedUser = { ...user, settings: { ...user.settings, privacy } };
-      setUser(updatedUser);
-      toast.success('Privacy settings saved!');
-    } catch (err) {
-      console.error('Error:', err);
-      toast.error('Failed to save privacy settings');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDownloadData = () => {
-    toast.success('Preparing your data export...');
-  };
-
-  const handleRequestDeletion = () => {
-    toast.info('Contact admin to request data deletion');
-  };
-
-  return (
-    <div className="space-y-6 w-full">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
-          <Palette size={16} className="text-success" />
-        </div>
-        <h3 className="text-lg font-semibold text-card-foreground">Privacy Settings</h3>
-      </div>
-      
-      <div className="bg-muted/30 rounded-xl border border-border p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <Palette size={16} className="text-primary" />
-          </div>
-          <div>
-            <h4 className="text-base font-semibold text-card-foreground">Privacy Controls</h4>
-            <p className="text-sm text-muted-foreground">Manage what information is visible to others</p>
-          </div>
-        </div>
-        
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <label className="text-sm font-medium text-card-foreground">Profile Visibility</label>
-              <p className="text-sm text-muted-foreground">Allow others to view your profile</p>
-            </div>
-            <button
-              onClick={() => handleToggle('profileVisible')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:scale-105 hover:shadow-lg ${
-                privacy.profileVisible ? 'bg-primary hover:bg-primary/90' : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  privacy.profileVisible ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="border-t border-border"></div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <label className="text-sm font-medium text-card-foreground">Show Skills</label>
-              <p className="text-sm text-muted-foreground">Display your skills on your public profile</p>
-            </div>
-            <button
-              onClick={() => handleToggle('skillsVisible')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:scale-105 hover:shadow-lg ${
-                privacy.skillsVisible ? 'bg-primary hover:bg-primary/90' : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  privacy.skillsVisible ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="border-t border-border"></div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <label className="text-sm font-medium text-card-foreground">Show Projects</label>
-              <p className="text-sm text-muted-foreground">Display your project history publicly</p>
-            </div>
-            <button
-              onClick={() => handleToggle('projectsVisible')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:scale-105 hover:shadow-lg ${
-                privacy.projectsVisible ? 'bg-primary hover:bg-primary/90' : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  privacy.projectsVisible ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="pt-4">
-            <button 
-              onClick={handleSave}
-              disabled={isLoading}
-              className="bg-primary text-primary-foreground py-2.5 px-6 rounded-lg hover:bg-primary/90 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Saving...' : 'Save Privacy Settings'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-muted/30 rounded-xl border border-border p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center">
-            <Palette size={16} className="text-secondary" />
-          </div>
-          <div>
-            <h4 className="text-base font-semibold text-card-foreground">Data Management</h4>
-            <p className="text-sm text-muted-foreground">Download or delete your personal data</p>
-          </div>
-        </div>
-        
-        <div className="space-y-4">
-          <button 
-            onClick={handleDownloadData}
-            className="w-full bg-card text-card-foreground border border-border py-2.5 px-4 rounded-lg hover:bg-secondary hover:text-secondary-foreground hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm font-medium"
-          >
-            Download My Data
-          </button>
-          
-          <button 
-            onClick={handleRequestDeletion}
-            className="w-full text-destructive border border-destructive/20 py-2.5 px-4 rounded-lg hover:bg-destructive hover:text-destructive-foreground hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm font-medium"
-          >
-            Request Data Deletion
           </button>
         </div>
       </div>
