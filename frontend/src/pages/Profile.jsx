@@ -1255,8 +1255,8 @@ function AddSkillModal({
                 <option value="PROGRAMMING">Programming</option>
                 <option value="WEB DEVELOPMENT">Web Development</option>
                 <option value="UI/UX DESIGN">UI/UX Design</option>
-                <option value="FRONTEND">Frontend</option>
-                <option value="BACKEND">Backend</option>
+                <option value="FRONTEND">Frontend Development</option>
+                <option value="BACKEND">Backend Development</option>
                 <option value="TOOLS">Programming Tools</option>
                 <option value="MOBILE DEVELOPMENT">Mobile Development</option>
                 <option value="DATA SCIENCE">Data Science</option>
