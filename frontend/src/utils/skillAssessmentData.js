@@ -91,6 +91,29 @@ export const skillAssessmentData = {
         "Can architect large-scale systems with C++ for performance",
         "Can contribute to systems software and game engine projects"
       ]
+    },
+    PHP: {
+      BEGINNER: [
+        "Can write basic PHP scripts with variables and echo statements",
+        "Can work with arrays and associative arrays",
+        "Can write simple functions and use built-in PHP functions",
+        "Can handle HTML forms with GET and POST methods",
+        "Can understand PHP syntax and basic control structures"
+      ],
+      INTERMEDIATE: [
+        "Can work with object-oriented PHP (classes and inheritance)",
+        "Can connect to databases (MySQL) using PDO or mysqli",
+        "Can implement session management and authentication",
+        "Can handle file uploads and file system operations",
+        "Can work with PHP frameworks like Laravel or CodeIgniter"
+      ],
+      EXPERT: [
+        "Can architect scalable PHP applications",
+        "Can implement advanced security practices and prevent vulnerabilities",
+        "Can optimize PHP performance and caching strategies",
+        "Can build RESTful APIs and microservices with PHP",
+        "Can lead PHP development and best practices"
+      ]
     }
   },
   "WEB DEVELOPMENT": {
@@ -253,6 +276,75 @@ export const skillAssessmentData = {
         "Can optimize Angular performance at scale",
         "Can implement advanced security patterns",
         "Can lead Angular adoption and best practices"
+      ]
+    },
+    jQuery: {
+      BEGINNER: [
+        "Can select DOM elements using jQuery selectors",
+        "Can manipulate HTML content and attributes",
+        "Can handle basic events (click, submit, change)",
+        "Can use jQuery animations and effects",
+        "Can understand jQuery syntax and chaining"
+      ],
+      INTERMEDIATE: [
+        "Can work with AJAX requests and API calls",
+        "Can create and manipulate DOM elements dynamically",
+        "Can implement event delegation",
+        "Can use jQuery plugins and extend functionality",
+        "Can work with jQuery UI components"
+      ],
+      EXPERT: [
+        "Can architect complex jQuery-based applications",
+        "Can optimize jQuery performance for large applications",
+        "Can create custom jQuery plugins",
+        "Can migrate from jQuery to modern frameworks",
+        "Can lead jQuery to modern JavaScript transitions"
+      ]
+    },
+    WordPress: {
+      BEGINNER: [
+        "Can install and configure WordPress",
+        "Can create and edit posts and pages",
+        "Can install and activate themes and plugins",
+        "Can manage media library and uploads",
+        "Can understand WordPress admin dashboard"
+      ],
+      INTERMEDIATE: [
+        "Can customize themes using child themes",
+        "Can create custom post types and taxonomies",
+        "Can develop custom WordPress plugins",
+        "Can work with WordPress hooks and filters",
+        "Can implement custom page templates"
+      ],
+      EXPERT: [
+        "Can architect complex WordPress applications",
+        "Can optimize WordPress performance and security",
+        "Can build custom themes from scratch",
+        "Can integrate WordPress with external APIs",
+        "Can lead WordPress development and best practices"
+      ]
+    },
+    "Responsive Design": {
+      BEGINNER: [
+        "Can use media queries for different screen sizes",
+        "Can create flexible layouts with CSS Grid and Flexbox",
+        "Can understand viewport meta tag and responsive units",
+        "Can implement basic mobile-first design principles",
+        "Can test websites on different devices"
+      ],
+      INTERMEDIATE: [
+        "Can design complex responsive layouts for multiple breakpoints",
+        "Can optimize images and assets for different devices",
+        "Can implement responsive typography and spacing",
+        "Can use CSS features like container queries",
+        "Can ensure touch-friendly interfaces for mobile"
+      ],
+      EXPERT: [
+        "Can architect comprehensive responsive design systems",
+        "Can optimize performance across all device types",
+        "Can implement advanced responsive patterns",
+        "Can ensure accessibility across all screen sizes",
+        "Can lead responsive design initiatives and standards"
       ]
     }
   },
@@ -1313,6 +1405,29 @@ export const skillAssessmentData = {
         "Can establish API governance and versioning strategies",
         "Can optimize APIs for scale and security",
         "Can lead API strategy and developer experience initiatives"
+      ]
+    },
+    "API Integration": {
+      BEGINNER: [
+        "Can make basic HTTP requests (GET, POST) to external APIs",
+        "Can use fetch or axios to consume REST APIs",
+        "Can handle basic API responses and parse JSON data",
+        "Can understand API authentication methods (API keys)",
+        "Can read and understand basic API documentation"
+      ],
+      INTERMEDIATE: [
+        "Can implement complex API integrations with multiple endpoints",
+        "Can handle OAuth2 and JWT token authentication",
+        "Can implement error handling and retry logic for API calls",
+        "Can work with webhooks and real-time API updates",
+        "Can optimize API integration performance and caching"
+      ],
+      EXPERT: [
+        "Can architect complex API integration systems and middleware",
+        "Can implement advanced error handling and circuit breaker patterns",
+        "Can design API integration frameworks and abstractions",
+        "Can optimize API integrations for scale and reliability",
+        "Can lead API integration strategy and best practices"
       ]
     },
     "Problem Solving": {
