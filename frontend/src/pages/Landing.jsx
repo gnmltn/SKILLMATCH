@@ -123,7 +123,7 @@ const Landing = () => {
               Empower Your Skills with SkillMatch
             </h1>
             <p className="text-base sm:text-lg mb-6 sm:mb-8 text-blue-50">
-              Discover, develop, and showcase your strengths through intelligent skill mapping designed for IT students and educators.
+              Discover, develop, and showcase your strengths with intelligent skill mapping that guides IT students toward career paths based on their skills.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <a href="/signup" className="bg-white text-blue-600 px-6 sm:px-8 py-3 rounded-2xl font-semibold hover:bg-gray-400 transition text-center text-sm sm:text-base shadow-lg">
@@ -202,10 +202,10 @@ const Landing = () => {
           </div>
           <div>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-6">
-              Designed for IT Students and Educators
+              Designed for IT Students
             </h2>
             <p className="text-gray-600 dark:text-gray-300 text-base sm:text-lg mb-6 sm:mb-8">
-              SkillMatch empowers students to take control of their learning journey while providing educators with powerful insights into student progress and skill development.
+              SkillMatch empowers IT students to take control of their learning journey, track progress, and explore career opportunities based on their skills data. 
             </p>
             <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
               <li className="flex items-start gap-3">
@@ -218,11 +218,11 @@ const Landing = () => {
               </li>
               <li className="flex items-start gap-3">
                 <img src={check} alt="check" className="w-5 h-5 sm:w-8 sm:h-8 flex-shrink-0 mt-1" />
-                <span className="text-gray-700 dark:text-gray-300 text-sm sm:text-base">Showcase your growth to employers</span>
+                <span className="text-gray-700 dark:text-gray-300 text-sm sm:text-base">Showcase your growth and skills</span>
               </li>
               <li className="flex items-start gap-3">
                 <img src={check} alt="check" className="w-5 h-5 sm:w-8 sm:h-8 flex-shrink-0 mt-1" />
-                <span className="text-gray-700 dark:text-gray-300 text-sm sm:text-base">Collaborate with peers and instructors</span>
+                <span className="text-gray-700 dark:text-gray-300 text-sm sm:text-base">Explore career paths tailored to your skills data</span>
               </li>
             </ul>
             <a href="/signup" className="inline-block bg-blue-600 text-white px-6 sm:px-8 py-3 rounded-2xl font-semibold hover:bg-blue-700 transition text-sm sm:text-base shadow-lg">
@@ -236,17 +236,17 @@ const Landing = () => {
       <section className="bg-gradient-to-r from-blue-600 via-blue-500 to-teal-400 text-white px-4 sm:px-6 py-12 sm:py-20">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
-            Ready to Transform Your Learning Journey?
+            Ready to Transform Your IT Journey?
           </h2>
           <p className="text-lg sm:text-xl mb-6 sm:mb-8 text-blue-50">
-            Join thousands of students already mapping their skills and achieving their goals
+            Join IT students already mapping their skills and shaping their careers.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
             <a href="/signup" className="bg-white text-blue-600 px-6 sm:px-8 py-3 rounded-2xl font-semibold hover:bg-gray-300 transition text-center text-sm sm:text-base shadow-lg">
               Get Started Free
             </a>
-            <a href="#features" className="border-2 border-white text-white px-6 sm:px-8 py-3 rounded-2xl font-semibold hover:bg-gray-300 hover:text-blue-600 transition text-center text-sm sm:text-base shadow-lg">
-              View Demo
+            <a href="/login" className="border-2 border-white text-white px-6 sm:px-8 py-3 rounded-2xl font-semibold hover:bg-gray-300 hover:text-blue-600 transition text-center text-sm sm:text-base shadow-lg">
+              Sign In Now
             </a>
           </div>
         </div>
