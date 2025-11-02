@@ -61,15 +61,21 @@ export default function AdminLogin() {
           lastName: user.lastName,
           email: user.email,
           profilePicture: user.profilePicture,
-          userType: user.userType,
-          isAdmin: user.isAdmin || true
+          userType: user.userType || 'admin',
+          role: user.role || 'admin',
+          isAdmin: user.isAdmin !== undefined ? user.isAdmin : true
         };
         
         try {
           localStorage.setItem('adminUser', JSON.stringify(minimalUserData));
         } catch (storageError) {
           console.error('Failed to store user data:', storageError);
-          localStorage.setItem('adminUser', JSON.stringify({ _id: user._id, email: user.email, isAdmin: true }));
+          localStorage.setItem('adminUser', JSON.stringify({ 
+            _id: user._id, 
+            email: user.email, 
+            role: 'admin',
+            isAdmin: true 
+          }));
         }
         
         localStorage.setItem('isAdmin', 'true');

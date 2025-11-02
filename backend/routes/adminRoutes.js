@@ -100,10 +100,11 @@ router.put('/profile', adminAuth, async (req, res) => {
     let admin;
     
     // Check if admin is from Admin collection or User collection
+    // Fetch with password selected for password verification
     if (req.user.constructor.modelName === 'Admin') {
       admin = await Admin.findById(req.user._id);
     } else {
-      admin = await User.findById(req.user._id);
+      admin = await User.findById(req.user._id).select('+password');
     }
 
     if (!admin) {
@@ -132,18 +133,25 @@ router.put('/profile', adminAuth, async (req, res) => {
     }
 
     // Update fields
-    if (name) admin.name = name;
+    if (name) {
+      // Parse name into firstName and lastName
+      const nameParts = name.trim().split(' ');
+      if (nameParts.length > 0) {
+        admin.firstName = nameParts[0];
+        admin.lastName = nameParts.slice(1).join(' ') || '';
+      }
+    }
     if (email) admin.email = email;
     if (newPassword) admin.password = newPassword;
 
     await admin.save();
 
-    // Format response
+    // Format response - use firstName and lastName for User model
     const userResponse = {
       _id: admin._id,
-      name: admin.name,
+      name: admin.name || `${admin.firstName || ''} ${admin.lastName || ''}`.trim(),
       email: admin.email,
-      profilePicture: admin.profilePicture,
+      profilePicture: admin.profilePicture || '',
       isAdmin: true
     };
 
@@ -206,13 +214,14 @@ router.post('/profile/picture', adminAuth, upload.single('profilePicture'), asyn
     // Format response
     const userResponse = {
       _id: admin._id,
-      name: admin.name || `${admin.firstName} ${admin.lastName}`,
+      name: admin.name || `${admin.firstName || ''} ${admin.lastName || ''}`.trim(),
       email: admin.email,
-      profilePicture: admin.profilePicture,
+      profilePicture: admin.profilePicture || '',
       isAdmin: true
     };
 
     console.log('✅ Profile picture updated:', userResponse.profilePicture);
+    console.log('✅ Full user response:', userResponse);
 
     // Log the activity
     await ActivityLog.create({

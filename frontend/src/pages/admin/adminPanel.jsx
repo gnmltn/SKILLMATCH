@@ -57,7 +57,8 @@ import {
   Info
 } from "lucide-react";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useTheme } from "../../contexts/ThemeContext";
 import logo from "../../assets/logo.png";
 
 // ========== 100% WORKING API FUNCTIONS ==========
@@ -357,11 +358,18 @@ const Sidebar = ({ activePage, setActivePage, adminUser }) => {
         <div className="flex items-center gap-3">
           {adminUser?.profilePicture ? (
             <img
-              src={adminUser.profilePicture}
+              src={adminUser.profilePicture.startsWith('http') 
+                ? adminUser.profilePicture 
+                : `http://localhost:5000${adminUser.profilePicture}`}
               alt="Admin"
               className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+              onError={(e) => {
+                // Fallback to initials if image fails to load
+                e.target.style.display = 'none';
+              }}
             />
-          ) : (
+          ) : null}
+          {!adminUser?.profilePicture && (
             <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
               {getInitials(adminUser?.name || 'Admin')}
             </div>
@@ -2005,7 +2013,15 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
         newPassword: '',
         confirmPassword: '',
       });
-      setProfilePreview(user.profilePicture || '');
+      // Update profilePreview with proper URL formatting
+      if (user.profilePicture) {
+        const imageUrl = user.profilePicture.startsWith('http') 
+          ? user.profilePicture 
+          : `http://localhost:5000${user.profilePicture}`;
+        setProfilePreview(imageUrl);
+      } else {
+        setProfilePreview('');
+      }
     }
   }, [user]);
 
@@ -2047,13 +2063,31 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
       // REAL API CALL
       const response = await uploadProfilePicture(profilePicture);
       
+      console.log('📸 Upload response:', response);
+      
       // Update user state with response from API
       setUser(response);
       
+      // Update profilePreview to use the new image URL from the server
+      // If response has profilePicture, use it; otherwise keep the preview
+      if (response.profilePicture) {
+        // If it's a relative path, prepend the backend URL
+        const imageUrl = response.profilePicture.startsWith('http') 
+          ? response.profilePicture 
+          : `http://localhost:5000${response.profilePicture}`;
+        setProfilePreview(imageUrl);
+        console.log('🖼️ Set profile preview to:', imageUrl);
+      }
+      
       // Update localStorage (use adminUser for admin sessions)
       const storedUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
-      const updatedStoredUser = { ...storedUser, ...response };
+      const updatedStoredUser = { 
+        ...storedUser, 
+        ...response,
+        profilePicture: response.profilePicture // Ensure profilePicture is included
+      };
       localStorage.setItem('adminUser', JSON.stringify(updatedStoredUser));
+      console.log('💾 Updated localStorage:', updatedStoredUser);
       
       toast.success('Profile picture updated successfully!');
       
@@ -2715,20 +2749,17 @@ const SettingsPage = ({ darkMode, toggleDarkMode, adminUser, setAdminUser }) => 
 
 // ========== MAIN ADMIN PANEL COMPONENT ==========
 const AdminPanel = () => {
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved !== null ? JSON.parse(saved) : window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isDarkMode: darkMode, toggleDarkMode } = useTheme();
   const [activePage, setActivePage] = useState("dashboard");
   const [adminUser, setAdminUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-
-  const toggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    localStorage.setItem('darkMode', JSON.stringify(newDarkMode));
-  };
+  
+  // Early return if we're on the login page (shouldn't happen, but prevents rendering)
+  if (location.pathname === '/admin/adminLogin') {
+    return null;
+  }
 
   const loadAdminProfile = async () => {
     try {
@@ -2739,15 +2770,35 @@ const AdminPanel = () => {
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         console.log('📁 Loaded user from localStorage:', userData);
+        // Format profile picture URL if needed
+        if (userData.profilePicture && !userData.profilePicture.startsWith('http')) {
+          userData.profilePicture = `http://localhost:5000${userData.profilePicture}`;
+        }
         setAdminUser(userData);
       }
 
-      // Then try to fetch from API
+      // Then try to fetch from API (this will override localStorage with fresh data)
       try {
         const profile = await fetchAdminProfileData();
-        console.log('🌐 Loaded user from API:', profile);
+        console.log('🌐 Loaded user from API (raw):', profile);
+        
+        // Ensure admin fields are set correctly
+        if (!profile.isAdmin && profile.role !== 'admin' && profile.userType !== 'admin') {
+          profile.isAdmin = true;
+          profile.role = 'admin';
+        }
+        
+        // Format profile picture URL for display only
+        if (profile.profilePicture) {
+          profile.profilePicture = profile.profilePicture.startsWith('http') 
+            ? profile.profilePicture 
+            : `http://localhost:5000${profile.profilePicture}`;
+        }
+        
         setAdminUser(profile);
+        // Store formatted URL in localStorage for quick access
         localStorage.setItem('adminUser', JSON.stringify(profile));
+        console.log('✅ Profile loaded and saved:', profile);
       } catch (apiError) {
         console.warn('⚠️ Could not fetch admin profile from API, using stored data:', apiError);
         // Continue with stored data
@@ -2766,6 +2817,14 @@ const AdminPanel = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
+      // Don't run auth check if we're already on the login page
+      // This prevents toasts from showing when AdminPanel accidentally mounts
+      if (location.pathname === '/admin/adminLogin') {
+        console.log('⏸️ Already on login page, skipping auth check');
+        setLoading(false);
+        return;
+      }
+
       console.log('🔐 Checking authentication...');
       
       // First check: if regular user is logged in (but not admin), redirect to dashboard
@@ -2787,8 +2846,11 @@ const AdminPanel = () => {
       
       if (!token || !user) {
         console.error('❌ No token or user, redirecting to login');
-        toast.error('Please login as admin first');
-        navigate('/admin/adminLogin');
+        // Only show toast if we're actually on the admin panel route
+        if (location.pathname === '/admin/adminPanel') {
+          toast.error('Please login as admin first');
+        }
+        navigate('/admin/adminLogin', { replace: true });
         return;
       }
 
@@ -2796,10 +2858,16 @@ const AdminPanel = () => {
         const userData = JSON.parse(user);
         console.log('🔐 User data:', userData);
         
-        if (!userData.isAdmin) {
-          console.error('❌ User is not admin, redirecting');
-          toast.error('Admin privileges required');
-          navigate('/admin/adminLogin');
+        // Check if user is admin - check both isAdmin flag and role field
+        const isAdmin = userData.isAdmin === true || userData.role === 'admin' || userData.userType === 'admin';
+        
+        if (!isAdmin) {
+          console.error('❌ User is not admin, redirecting. User data:', userData);
+          // Only show toast if we're actually on the admin panel route
+          if (location.pathname === '/admin/adminPanel') {
+            toast.error('Admin privileges required');
+          }
+          navigate('/admin/adminLogin', { replace: true });
           return;
         }
 
@@ -2808,8 +2876,11 @@ const AdminPanel = () => {
         
       } catch (error) {
         console.error('❌ Auth check error:', error);
-        toast.error('Invalid user data');
-        navigate('/admin/adminLogin');
+        // Only show toast if we're actually on the admin panel route
+        if (location.pathname === '/admin/adminPanel') {
+          toast.error('Invalid user data');
+        }
+        navigate('/admin/adminLogin', { replace: true });
       } finally {
         setLoading(false);
         console.log('✅ Auth check complete');
@@ -2817,15 +2888,8 @@ const AdminPanel = () => {
     };
 
     checkAuth();
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [darkMode]);
 
   const renderContent = () => {
     if (loading) {
@@ -2889,8 +2953,23 @@ const AdminPanel = () => {
                 </span>
               </div>
             </div>
-            <div className="text-sm text-gray-500">
-              {adminUser?.name || 'System Admin'}
+            <div className="flex items-center gap-4">
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={toggleDarkMode}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200 flex items-center justify-center"
+                title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                aria-label={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                {darkMode ? (
+                  <Sun className="w-5 h-5 text-yellow-500" />
+                ) : (
+                  <Moon className="w-5 h-5 text-gray-600" />
+                )}
+              </button>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {adminUser?.name || 'System Admin'}
+              </div>
             </div>
           </nav>
         </div>
