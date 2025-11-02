@@ -282,7 +282,8 @@ router.post("/login/send-otp", async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Your account has been archived by an administrator",
-        isArchived: true
+        isArchived: true,
+        archivedAt: user.archivedAt || null
       });
     }
 
@@ -358,7 +359,8 @@ router.post("/login/verify-otp", async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Your account has been archived by an administrator",
-        isArchived: true
+        isArchived: true,
+        archivedAt: user.archivedAt || null
       });
     }
 
@@ -564,7 +566,8 @@ router.post("/login", async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Your account has been archived by an administrator",
-        isArchived: true
+        isArchived: true,
+        archivedAt: user.archivedAt || null
       });
     }
 
@@ -631,7 +634,8 @@ router.get("/me", async (req, res) => {
           _id: user._id,
           firstName: user.firstName,
           lastName: user.lastName,
-          email: user.email
+          email: user.email,
+          archivedAt: user.archivedAt || null
         }
       });
     }
@@ -719,7 +723,8 @@ router.post("/google", async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Your account has been archived by an administrator",
-        isArchived: true
+        isArchived: true,
+        archivedAt: user.archivedAt || null
       });
     }
 

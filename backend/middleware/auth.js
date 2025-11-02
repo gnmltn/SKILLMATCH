@@ -38,7 +38,8 @@ export const protect = async (req, res, next) => {
         return res.status(403).json({
           success: false,
           message: 'Your account has been archived by an administrator',
-          isArchived: true
+          isArchived: true,
+          archivedAt: user.archivedAt || null
         });
       }
 

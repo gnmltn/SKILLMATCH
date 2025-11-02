@@ -25,6 +25,17 @@ const apiService = {
         const data = await response.json().catch(() => ({}));
         if (data.isArchived) {
           localStorage.removeItem('token');
+          // Store archived info before clearing user data
+          if (data.user && data.user.archivedAt) {
+            try {
+              const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+              currentUser.archivedAt = data.user.archivedAt;
+              localStorage.setItem('user', JSON.stringify(currentUser));
+            } catch (e) {
+              // If parsing fails, store minimal archived info
+              localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.user.archivedAt }));
+            }
+          }
           localStorage.removeItem('user');
           window.location.href = '/archived-account';
           throw new Error('Account archived');
@@ -39,6 +50,14 @@ const apiService = {
     // Double-check archived status in response
     if (data.isArchived) {
       localStorage.removeItem('token');
+      // Store archived info before clearing user data
+      if (data.user && data.user.archivedAt) {
+        try {
+          localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.user.archivedAt }));
+        } catch (e) {
+          console.error('Failed to store archived info:', e);
+        }
+      }
       localStorage.removeItem('user');
       window.location.href = '/archived-account';
       throw new Error('Account archived');

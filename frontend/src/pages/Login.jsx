@@ -51,6 +51,10 @@ const Login = () => {
       if (!res.ok) {
         // Check if account is archived
         if (data.isArchived) {
+          // Store archived date if available
+          if (data.archivedAt) {
+            localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.archivedAt }));
+          }
           navigate('/archived-account');
           return;
         }
@@ -136,6 +140,10 @@ const Login = () => {
       if (!response.ok) {
         // Check if account is archived
         if (data.isArchived) {
+          // Store archived date if available
+          if (data.archivedAt) {
+            localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.archivedAt }));
+          }
           navigate('/archived-account');
           return;
         }
@@ -190,6 +198,10 @@ const Login = () => {
       if (!response.ok) {
         // Check if account is archived
         if (data.isArchived) {
+          // Store archived date if available
+          if (data.archivedAt) {
+            localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.archivedAt }));
+          }
           navigate('/archived-account');
           return;
         }
@@ -258,6 +270,10 @@ const Login = () => {
       if (!response.ok) {
         // Check if account is archived
         if (data.isArchived) {
+          // Store archived date if available
+          if (data.archivedAt) {
+            localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.archivedAt }));
+          }
           navigate('/archived-account');
           return;
         }
