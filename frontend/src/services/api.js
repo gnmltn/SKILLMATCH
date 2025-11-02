@@ -19,10 +19,31 @@ const apiService = {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
+      
+      // Check if user is archived
+      if (response.status === 403) {
+        const data = await response.json().catch(() => ({}));
+        if (data.isArchived) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.href = '/archived-account';
+          throw new Error('Account archived');
+        }
+      }
+      
       throw new Error('Failed to get current user');
     }
 
     const data = await response.json();
+    
+    // Double-check archived status in response
+    if (data.isArchived) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/archived-account';
+      throw new Error('Account archived');
+    }
+    
     return data;
   },
 

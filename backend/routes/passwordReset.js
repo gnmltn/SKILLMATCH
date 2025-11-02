@@ -158,6 +158,14 @@ router.post("/reset-password", async (req, res) => {
       });
     }
 
+    // Check for whitespace in password
+    if (/\s/.test(newPassword)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password cannot contain whitespace" 
+      });
+    }
+
     // Check password strength
     if (newPassword.length < 8) {
       return res.status(400).json({ 

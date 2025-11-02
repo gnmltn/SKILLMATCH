@@ -24,11 +24,25 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('token');
       if (token) {
         const response = await apiService.getCurrentUser();
+        
+        // Check if user is archived
+        if (response.isArchived) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.href = '/archived-account';
+          return;
+        }
+        
         setUser(response.user);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      localStorage.removeItem('token');
+      
+      // If account is archived, don't clear token here as redirect handles it
+      if (!error.message.includes('Account archived')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
     } finally {
       setLoading(false);
     }

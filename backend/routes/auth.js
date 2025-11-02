@@ -56,6 +56,13 @@ router.post("/signup/send-otp", async (req, res) => {
       });
     }
 
+    // Check for whitespace in password
+    if (/\s/.test(password)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password cannot contain whitespace" 
+      });
+    }
    
     if (password.length < 8) {
       return res.status(400).json({ 
@@ -139,6 +146,31 @@ router.post("/signup/verify-otp", async (req, res) => {
       return res.status(400).json({ 
         success: false,
         message: "Please provide all required fields" 
+      });
+    }
+
+    // Check for whitespace in password
+    if (/\s/.test(password)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password cannot contain whitespace" 
+      });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password must be at least 8 characters" 
+      });
+    }
+
+    const hasNumber = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    if (!hasNumber || !hasSpecialChar) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password must contain at least 1 number and 1 special character" 
       });
     }
 
@@ -245,6 +277,15 @@ router.post("/login/send-otp", async (req, res) => {
       });
     }
 
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been archived by an administrator",
+        isArchived: true
+      });
+    }
+
     const otpCode = PasswordReset.generateOTP();
     
     await PasswordReset.deleteMany({ email: cleanEmail });
@@ -309,6 +350,15 @@ router.post("/login/verify-otp", async (req, res) => {
       return res.status(404).json({ 
         success: false,
         message: "User not found" 
+      });
+    }
+
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been archived by an administrator",
+        isArchived: true
       });
     }
 
@@ -384,6 +434,14 @@ router.post("/signup", async (req, res) => {
       return res.status(400).json({ 
         success: false,
         message: "Passwords do not match" 
+      });
+    }
+
+    // Check for whitespace in password
+    if (/\s/.test(password)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password cannot contain whitespace" 
       });
     }
 
@@ -501,6 +559,15 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been archived by an administrator",
+        isArchived: true
+      });
+    }
+
     const token = generateToken(user._id);
 
     console.log("LOGIN SUCCESSFUL for user:", user._id);
@@ -551,6 +618,21 @@ router.get("/me", async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'User not found'
+      });
+    }
+
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been archived by an administrator",
+        isArchived: true,
+        user: {
+          _id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email
+        }
       });
     }
 
@@ -629,6 +711,15 @@ router.post("/google", async (req, res) => {
         password: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
         userType: "student",
         profilePicture: payload.picture || null
+      });
+    }
+
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been archived by an administrator",
+        isArchived: true
       });
     }
 

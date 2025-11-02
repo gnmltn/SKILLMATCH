@@ -90,6 +90,11 @@ router.put('/user', async (req, res) => {
 
     // Update password
     if (newPassword) {
+      // Check for whitespace in password
+      if (/\s/.test(newPassword)) {
+        return res.status(400).json({ error: 'Password cannot contain whitespace' });
+      }
+      
       if (newPassword.length < 6) {
         return res.status(400).json({ error: 'Password must be at least 6 characters' });
       }

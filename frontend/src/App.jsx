@@ -14,6 +14,7 @@ import Suggestions from "./pages/Suggestions.jsx";
 import CareerPath from "./pages/CareerPath.jsx";
 import AdminLogin from "./pages/admin/adminLogin.jsx"; 
 import AdminPanel from "./pages/admin/adminPanel.jsx";
+import ArchivedAccount from "./pages/ArchivedAccount.jsx";
 import ThemeTransition from "./components/ThemeTransition.jsx";
 import InactivityTracker from "./components/InactivityTracker.jsx";
 
@@ -38,6 +39,7 @@ function AppContent() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/admin/adminLogin" element={<AdminLogin />} />
           <Route path="/admin/adminPanel" element={<AdminPanel/>} />
+          <Route path="/archived-account" element={<ArchivedAccount />} />
         </Routes>
         <Toaster 
           position="bottom-right" 
