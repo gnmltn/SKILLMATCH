@@ -7,7 +7,26 @@ import {
   CheckCircle2, 
   AlertCircle, 
   GraduationCap,
-  Sparkles
+  Sparkles,
+  Code,
+  Palette,
+  BarChart3,
+  Database,
+  Smartphone,
+  Shield,
+  Cloud,
+  Brain,
+  TestTube2,
+  Wrench,
+  Network,
+  Cpu,
+  Globe,
+  Server,
+  Users,
+  Lock,
+  Zap,
+  MessageSquare,
+  Layout
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DashboardNav from '../components/dashboardNav.jsx';
@@ -131,6 +150,69 @@ const getProficiencyLabel = (userProficiency) => {
   if (userProficiency >= 50) return 'Intermediate';
   if (userProficiency >= 25) return 'Developing';
   return 'Beginner';
+};
+
+// Enhanced Icon mapping for career paths with cute and accurate icons
+const getCareerIcon = (careerTitle) => {
+  const title = careerTitle.toLowerCase();
+  
+  if (title.includes('frontend') && !title.includes('ui') && !title.includes('ux')) {
+    return <Layout className="h-12 w-12 text-blue-500" />;
+  }
+  if (title.includes('ui') || title.includes('ux') || title.includes('design')) {
+    return <Palette className="h-12 w-12 text-pink-500" />;
+  }
+  if (title.includes('backend') || title.includes('api') || title.includes('server') || title.includes('architecture')) {
+    return <Server className="h-12 w-12 text-green-500" />;
+  }
+  if (title.includes('data') || title.includes('analyst') || title.includes('analytics') || title.includes('science')) {
+    return <BarChart3 className="h-12 w-12 text-purple-500" />;
+  }
+  if (title.includes('database') || title.includes('dba') || title.includes('sql') || title.includes('mongodb')) {
+    return <Database className="h-12 w-12 text-orange-500" />;
+  }
+  if (title.includes('mobile') || title.includes('ios') || title.includes('android') || title.includes('react native')) {
+    return <Smartphone className="h-12 w-12 text-indigo-500" />;
+  }
+  if (title.includes('security') || title.includes('cyber') || title.includes('penetration') || title.includes('infosec')) {
+    return <Shield className="h-12 w-12 text-red-500" />;
+  }
+  if (title.includes('cloud') || title.includes('devops') || title.includes('aws') || title.includes('azure')) {
+    return <Cloud className="h-12 w-12 text-cyan-500" />;
+  }
+  if (title.includes('ai') || title.includes('machine learning') || title.includes('ml') || title.includes('neural')) {
+    return <Brain className="h-12 w-12 text-pink-600" />;
+  }
+  if (title.includes('qa') || title.includes('testing') || title.includes('test') || title.includes('quality')) {
+    return <TestTube2 className="h-12 w-12 text-yellow-500" />;
+  }
+  if (title.includes('full stack') || title.includes('fullstack') || title.includes('full-stack')) {
+    return <Cpu className="h-12 w-12 text-teal-500" />;
+  }
+  if (title.includes('network') || title.includes('infrastructure') || title.includes('sysadmin')) {
+    return <Network className="h-12 w-12 text-lime-500" />;
+  }
+  if (title.includes('web') || title.includes('developer') || title.includes('programming')) {
+    return <Globe className="h-12 w-12 text-blue-500" />;
+  }
+  if (title.includes('software') || title.includes('engineer') || title.includes('development')) {
+    return <Code className="h-12 w-12 text-blue-600" />;
+  }
+  if (title.includes('product') || title.includes('manager') || title.includes('pm')) {
+    return <Users className="h-12 w-12 text-violet-500" />;
+  }
+  if (title.includes('cryptography') || title.includes('encryption') || title.includes('security')) {
+    return <Lock className="h-12 w-12 text-gray-600" />;
+  }
+  if (title.includes('embedded') || title.includes('iot') || title.includes('hardware')) {
+    return <Zap className="h-12 w-12 text-amber-500" />;
+  }
+  if (title.includes('chatbot') || title.includes('nlp') || title.includes('language processing')) {
+    return <MessageSquare className="h-12 w-12 text-green-600" />;
+  }
+  
+  // Default icon for other careers - more friendly
+  return <Briefcase className="h-12 w-12 text-gray-500" />;
 };
 
 export default function CareerPath() {
@@ -348,8 +430,8 @@ export default function CareerPath() {
                   topMatch.qualifies ? successTextClass : infoTextClass
                 }`}>
                   {topMatch.qualifies 
-                    ? `✅ You qualify for ${topMatch.title}! You have all required skills at 75%+ proficiency.`
-                    : `📊 Found ${rankedPaths.length} career paths. ${rankedPaths.filter(p => p.qualifies).length} meet the 75% proficiency requirement.`
+                    ? `You qualify for ${topMatch.title}! You have all required skills at 75%+ proficiency.`
+                    : `Found ${rankedPaths.length} career paths. ${rankedPaths.filter(p => p.qualifies).length} meet the 75% proficiency requirement.`
                   }
                 </p>
                 <p className={`text-xs ${
@@ -402,7 +484,7 @@ export default function CareerPath() {
 
           {/* Career Overview */}
           <div className="flex items-center gap-4 mb-6">
-            <div className="text-5xl">{topMatch.icon}</div>
+            <div className="text-5xl">{getCareerIcon(topMatch.title)}</div>
             <div className="flex-1">
               <h3 className={`text-2xl font-bold ${textClass}`}>{topMatch.title}</h3>
               <p className={`${mutedTextClass} mb-3`}>{topMatch.description}</p>
@@ -550,7 +632,7 @@ export default function CareerPath() {
                 {/* Card Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="text-3xl">{career.icon}</div>
+                    <div className="text-3xl">{getCareerIcon(career.title)}</div>
                     <div>
                       <h3 className={`text-lg font-semibold ${textClass}`}>{career.title}</h3>
                       <p className={mutedTextClass}>{career.description}</p>
