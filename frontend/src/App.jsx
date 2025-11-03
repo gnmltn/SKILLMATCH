@@ -17,6 +17,7 @@ import AdminPanel from "./pages/admin/adminPanel.jsx";
 import ArchivedAccount from "./pages/ArchivedAccount.jsx";
 import ThemeTransition from "./components/ThemeTransition.jsx";
 import InactivityTracker from "./components/InactivityTracker.jsx";
+import HeartbeatTracker from "./components/HeartbeatTracker.jsx";
 
 function AppContent() {
   const { isDarkMode, isThemeTransitioning } = useTheme();
@@ -25,6 +26,7 @@ function AppContent() {
     <Router>
       <div className={isDarkMode ? 'dark' : ''}>
         <InactivityTracker />
+        <HeartbeatTracker />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/landing" element={<Landing />} />

@@ -598,18 +598,25 @@ router.get('/users', adminAuth, async (req, res) => {
 
     console.log('🔍 Fetching users with filters:', { page, limit, search, status });
 
-    // Build filter object - exclude archived users (handle both new and existing users)
+    // Build filter object
     const filter = { 
       userType: 'student',
-      $and: [
-        {
-          $or: [
-            { isArchived: false },
-            { isArchived: { $exists: false } }
-          ]
-        }
-      ]
+      $and: []
     };
+
+    // Handle Suspended status differently - show archived users
+    if (status === 'Suspended') {
+      // For Suspended, include only archived users
+      filter.$and.push({ isArchived: true });
+    } else {
+      // For other statuses, exclude archived users
+      filter.$and.push({
+        $or: [
+          { isArchived: false },
+          { isArchived: { $exists: false } }
+        ]
+      });
+    }
     
     // Search filter
     if (search) {
@@ -622,15 +629,26 @@ router.get('/users', adminAuth, async (req, res) => {
       });
     }
 
-    // Status filter
-    if (status !== 'all') {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Status filter (only for Active/Inactive, not Suspended)
+    if (status !== 'all' && status !== 'Suspended') {
+      const tenSecondsAgo = new Date(Date.now() - 10 * 1000); // 10 seconds ago
       
       if (status === 'Active') {
-        filter.updatedAt = { $gte: thirtyDaysAgo };
+        filter.$and.push({
+          $and: [
+            { lastActivity: { $gte: tenSecondsAgo } },
+            { isOnline: true }
+          ]
+        });
       } else if (status === 'Inactive') {
-        filter.updatedAt = { $lt: thirtyDaysAgo };
+        filter.$and.push({
+          $or: [
+            { lastActivity: { $exists: false } },
+            { lastActivity: null },
+            { lastActivity: { $lt: tenSecondsAgo } },
+            { isOnline: false }
+          ]
+        });
       }
     }
 
@@ -639,7 +657,7 @@ router.get('/users', adminAuth, async (req, res) => {
     
     // Get users with pagination
     const users = await User.find(filter)
-      .select('firstName lastName email createdAt updatedAt userType')
+      .select('firstName lastName email createdAt updatedAt userType lastActivity isOnline isArchived')
       .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -654,8 +672,8 @@ router.get('/users', adminAuth, async (req, res) => {
       name: `${user.firstName} ${user.lastName}`,
       email: user.email,
       joinDate: user.createdAt.toLocaleDateString(),
-      lastLogin: getTimeAgo(user.updatedAt),
-      status: getStatusFromLastActivity(user.updatedAt),
+      lastLogin: getTimeAgo(user.lastActivity || user.updatedAt),
+      status: user.isArchived ? 'Suspended' : getStatusFromLastActivity(user.lastActivity),
       type: user.userType || 'student'
     }));
 
@@ -735,7 +753,7 @@ router.put('/users/:id', adminAuth, async (req, res) => {
           id: user._id,
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
-          status: getStatusFromLastActivity(user.updatedAt),
+          status: getStatusFromLastActivity(user.lastActivity),
           type: user.userType
         }
       }
@@ -846,7 +864,7 @@ router.get('/users/archived', adminAuth, async (req, res) => {
     
     // Get archived users with pagination
     const users = await User.find(filter)
-      .select('firstName lastName email createdAt updatedAt userType archivedAt')
+      .select('firstName lastName email createdAt updatedAt userType archivedAt lastActivity isOnline')
       .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -862,7 +880,8 @@ router.get('/users/archived', adminAuth, async (req, res) => {
       email: user.email,
       joinDate: user.createdAt.toLocaleDateString(),
       archivedAt: user.archivedAt ? user.archivedAt.toLocaleDateString() : 'N/A',
-      lastLogin: getTimeAgo(user.updatedAt),
+      lastLogin: getTimeAgo(user.lastActivity || user.updatedAt),
+      status: getStatusFromLastActivity(user.lastActivity),
       type: user.userType || 'student'
     }));
 
@@ -1331,10 +1350,14 @@ function getSkillCategory(skillName) {
 
 // ========== HELPER FUNCTIONS ==========
 function getStatusFromLastActivity(lastActivity) {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  if (!lastActivity) {
+    return 'Inactive';
+  }
   
-  return lastActivity >= thirtyDaysAgo ? 'Active' : 'Inactive';
+  const now = new Date();
+  const tenSecondsAgo = new Date(now.getTime() - 10 * 1000); // 10 seconds ago
+  
+  return lastActivity >= tenSecondsAgo ? 'Active' : 'Inactive';
 }
 
 function getTimeAgo(date) {

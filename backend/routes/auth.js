@@ -369,6 +369,11 @@ router.post("/login/verify-otp", async (req, res) => {
 
     const token = generateToken(user._id);
 
+    // Set user as online and update lastActivity
+    user.isOnline = true;
+    user.lastActivity = new Date();
+    await user.save({ validateBeforeSave: false });
+
     console.log("LOGIN SUCCESSFUL for user:", user._id);
     
     // Log user login activity
@@ -573,6 +578,11 @@ router.post("/login", async (req, res) => {
 
     const token = generateToken(user._id);
 
+    // Set user as online and update lastActivity
+    user.isOnline = true;
+    user.lastActivity = new Date();
+    await user.save({ validateBeforeSave: false });
+
     console.log("LOGIN SUCCESSFUL for user:", user._id);
     
     return res.status(200).json({
@@ -730,6 +740,11 @@ router.post("/google", async (req, res) => {
 
     // Generate token for Google user
     const token = generateToken(user._id);
+
+    // Set user as online and update lastActivity
+    user.isOnline = true;
+    user.lastActivity = new Date();
+    await user.save({ validateBeforeSave: false });
 
     // Log user login activity for Google login
     try {
@@ -993,6 +1008,11 @@ router.post("/logout", async (req, res) => {
       const user = await User.findById(decoded.id);
       
       if (user) {
+        // Set user as offline and clear lastActivity
+        user.isOnline = false;
+        user.lastActivity = null;
+        await user.save({ validateBeforeSave: false });
+        
         // Log user logout activity
         try {
           const logoutReason = reason === 'inactivity' ? 'Session expired due to inactivity' : 'Logged out successfully';
@@ -1029,6 +1049,56 @@ router.post("/logout", async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Logged out successfully"
+    });
+  }
+});
+
+// Heartbeat endpoint - updates user's lastActivity timestamp
+router.post("/heartbeat", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required"
+      });
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+      const user = await User.findById(decoded.id);
+      
+      if (user) {
+        // Update lastActivity and set isOnline
+        user.lastActivity = new Date();
+        user.isOnline = true;
+        await user.save({ validateBeforeSave: false });
+        
+        return res.status(200).json({
+          success: true,
+          message: "Heartbeat updated",
+          lastActivity: user.lastActivity
+        });
+      }
+    } catch (tokenError) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token"
+      });
+    }
+
+    return res.status(404).json({
+      success: false,
+      message: "User not found"
+    });
+
+  } catch (error) {
+    console.error("HEARTBEAT ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error during heartbeat",
+      error: error.message
     });
   }
 });

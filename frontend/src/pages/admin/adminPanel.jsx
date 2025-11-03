@@ -1382,7 +1382,7 @@ const ManageUsers = () => {
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        {user.type !== 'admin' && (
+                        {user.type !== 'admin' && user.status !== 'Suspended' && (
                           <button 
                             onClick={() => handleArchive(user)}
                             className="p-1 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition"
