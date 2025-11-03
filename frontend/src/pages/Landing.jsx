@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 import logo from '../assets/logo.png';
-import container from '../assets/Container.png';
+import container from '../assets/container.png';
 import girl from '../assets/girl.png';
 import brain from '../assets/brain.png';
 import up from '../assets/up.png';
@@ -129,9 +129,6 @@ const Landing = () => {
               <a href="/signup" className="bg-white text-blue-600 px-6 sm:px-8 py-3 rounded-2xl font-semibold hover:bg-gray-400 transition text-center text-sm sm:text-base shadow-lg">
                 Get Started
               </a>
-              <a href="#features" className="border-2 border-white text-white px-6 sm:px-8 py-3 rounded-2xl font-semibold hover:bg-gray-200 hover:text-blue-600 transition text-center text-sm sm:text-base shadow-lg">
-                Learn More
-              </a>
             </div>
           </div>
           <div className="order-1 md:order-2">
@@ -225,9 +222,6 @@ const Landing = () => {
                 <span className="text-gray-700 dark:text-gray-300 text-sm sm:text-base">Explore career paths tailored to your skills data</span>
               </li>
             </ul>
-            <a href="/signup" className="inline-block bg-blue-600 text-white px-6 sm:px-8 py-3 rounded-2xl font-semibold hover:bg-blue-700 transition text-sm sm:text-base shadow-lg">
-              Sign Up Free
-            </a>
           </div>
         </div>
       </section>
@@ -243,7 +237,7 @@ const Landing = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
             <a href="/signup" className="bg-white text-blue-600 px-6 sm:px-8 py-3 rounded-2xl font-semibold hover:bg-gray-300 transition text-center text-sm sm:text-base shadow-lg">
-              Get Started Free
+              Get Started
             </a>
             <a href="/login" className="border-2 border-white text-white px-6 sm:px-8 py-3 rounded-2xl font-semibold hover:bg-gray-300 hover:text-blue-600 transition text-center text-sm sm:text-base shadow-lg">
               Sign In Now
