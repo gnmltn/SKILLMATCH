@@ -37,7 +37,7 @@ export default function DashboardNav({
   links = [
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/profile', label: 'Profile' },
-    { to: '/roles', label: 'Role History' },
+    { to: '/roles', label: 'Project History' },
     { to: '/suggestions', label: 'Suggestions' },
     { to: '/career-paths', label: 'Career Paths' },
   ],

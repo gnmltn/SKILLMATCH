@@ -432,7 +432,7 @@ export default function Profile() {
                 Skills
               </Tab>
               <Tab active={activeTab === 'roleHistory'} onClick={() => setActiveTab('roleHistory')}>
-                Role History
+                Project History
               </Tab>
               <Tab active={activeTab === 'growthPlan'} onClick={() => setActiveTab('growthPlan')}>
                 Growth Plan
@@ -525,7 +525,7 @@ export default function Profile() {
                   onClick={() => navigate('/roles')}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm text-success bg-success/10 rounded-lg hover:bg-success/20 border border-success/20 transition-colors"
                 >
-                  <ChevronRight size={16} /> Go to Role History
+                  <ChevronRight size={16} /> Go to Project History
                 </button>
               </div>
 
