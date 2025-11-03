@@ -2979,24 +2979,6 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
           </div>
         </div>
       </div>
-
-      {/* Danger Zone */}
-      <div className="border border-red-200 dark:border-red-800 rounded-xl p-6 bg-red-50 dark:bg-red-900/20 w-full">
-        <div className="flex items-center gap-3 mb-4">
-          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-          <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h3>
-        </div>
-        <p className="text-sm text-red-600 dark:text-red-400/80 mb-4">
-          Once you delete your account, there is no going back. Please be certain.
-        </p>
-        <button 
-          onClick={handleDeleteAccount}
-          className="flex items-center gap-2 bg-red-600 text-white py-2.5 px-4 rounded-lg hover:bg-red-700 transition-all duration-200 text-sm font-medium"
-        >
-          <Trash2 size={16} />
-          Delete Account
-        </button>
-      </div>
     </div>
   );
 }
