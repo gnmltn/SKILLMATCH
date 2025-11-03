@@ -33,6 +33,16 @@ export const protect = async (req, res, next) => {
         });
       }
 
+      // Check if user is archived
+      if (user.isArchived) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account has been archived by an administrator',
+          isArchived: true,
+          archivedAt: user.archivedAt || null
+        });
+      }
+
       req.user = user;
       next();
     } catch (error) {

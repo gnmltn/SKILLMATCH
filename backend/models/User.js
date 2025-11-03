@@ -220,6 +220,22 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       default: 'user'
+    },
+    isArchived: {
+      type: Boolean,
+      default: false
+    },
+    archivedAt: {
+      type: Date,
+      default: null
+    },
+    lastActivity: {
+      type: Date,
+      default: null
+    },
+    isOnline: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }

@@ -49,6 +49,15 @@ const Login = () => {
       const data = await res.json();
 
       if (!res.ok) {
+        // Check if account is archived
+        if (data.isArchived) {
+          // Store archived date if available
+          if (data.archivedAt) {
+            localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.archivedAt }));
+          }
+          navigate('/archived-account');
+          return;
+        }
         setServerError(data.message || 'Google login failed');
         return;
       }
@@ -129,6 +138,15 @@ const Login = () => {
       const data = await response.json();
 
       if (!response.ok) {
+        // Check if account is archived
+        if (data.isArchived) {
+          // Store archived date if available
+          if (data.archivedAt) {
+            localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.archivedAt }));
+          }
+          navigate('/archived-account');
+          return;
+        }
         setServerError(data.message || 'Login failed. Please try again.');
         return;
       }
@@ -178,6 +196,15 @@ const Login = () => {
 
       // Check if response is ok after parsing JSON
       if (!response.ok) {
+        // Check if account is archived
+        if (data.isArchived) {
+          // Store archived date if available
+          if (data.archivedAt) {
+            localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.archivedAt }));
+          }
+          navigate('/archived-account');
+          return;
+        }
         setOtpError(data.message || `Server error: ${response.status} ${response.statusText}`);
         return;
       }
@@ -241,6 +268,15 @@ const Login = () => {
       const data = await response.json();
 
       if (!response.ok) {
+        // Check if account is archived
+        if (data.isArchived) {
+          // Store archived date if available
+          if (data.archivedAt) {
+            localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.archivedAt }));
+          }
+          navigate('/archived-account');
+          return;
+        }
         setOtpError(data.message || 'Failed to resend OTP.');
         return;
       }

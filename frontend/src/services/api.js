@@ -19,10 +19,50 @@ const apiService = {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
+      
+      // Check if user is archived
+      if (response.status === 403) {
+        const data = await response.json().catch(() => ({}));
+        if (data.isArchived) {
+          localStorage.removeItem('token');
+          // Store archived info before clearing user data
+          if (data.user && data.user.archivedAt) {
+            try {
+              const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+              currentUser.archivedAt = data.user.archivedAt;
+              localStorage.setItem('user', JSON.stringify(currentUser));
+            } catch (e) {
+              // If parsing fails, store minimal archived info
+              localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.user.archivedAt }));
+            }
+          }
+          localStorage.removeItem('user');
+          window.location.href = '/archived-account';
+          throw new Error('Account archived');
+        }
+      }
+      
       throw new Error('Failed to get current user');
     }
 
     const data = await response.json();
+    
+    // Double-check archived status in response
+    if (data.isArchived) {
+      localStorage.removeItem('token');
+      // Store archived info before clearing user data
+      if (data.user && data.user.archivedAt) {
+        try {
+          localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.user.archivedAt }));
+        } catch (e) {
+          console.error('Failed to store archived info:', e);
+        }
+      }
+      localStorage.removeItem('user');
+      window.location.href = '/archived-account';
+      throw new Error('Account archived');
+    }
+    
     return data;
   },
 

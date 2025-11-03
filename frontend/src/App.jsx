@@ -14,8 +14,10 @@ import Suggestions from "./pages/Suggestions.jsx";
 import CareerPath from "./pages/CareerPath.jsx";
 import AdminLogin from "./pages/admin/adminLogin.jsx"; 
 import AdminPanel from "./pages/admin/adminPanel.jsx";
+import ArchivedAccount from "./pages/ArchivedAccount.jsx";
 import ThemeTransition from "./components/ThemeTransition.jsx";
 import InactivityTracker from "./components/InactivityTracker.jsx";
+import HeartbeatTracker from "./components/HeartbeatTracker.jsx";
 
 function AppContent() {
   const { isDarkMode, isThemeTransitioning } = useTheme();
@@ -24,6 +26,7 @@ function AppContent() {
     <Router>
       <div className={isDarkMode ? 'dark' : ''}>
         <InactivityTracker />
+        <HeartbeatTracker />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/landing" element={<Landing />} />
@@ -38,6 +41,7 @@ function AppContent() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/admin/adminLogin" element={<AdminLogin />} />
           <Route path="/admin/adminPanel" element={<AdminPanel/>} />
+          <Route path="/archived-account" element={<ArchivedAccount />} />
         </Routes>
         <Toaster 
           position="bottom-right" 

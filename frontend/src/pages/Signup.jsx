@@ -43,6 +43,10 @@ const Signup = () => {
     return gmailRegex.test(value);
   };
   const validatePassword = (value) => {
+    // Check for whitespace first - reject if any whitespace found
+    if (/\s/.test(value)) {
+      return false;
+    }
     const hasMinLength = value.length >= 8;
     const hasNumber = /\d/.test(value);
     const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value);
@@ -55,6 +59,11 @@ const Signup = () => {
 
     if (name === 'firstName' || name === 'lastName') {
       finalValue = value.replace(/[^a-zA-Z\s]/g, '');
+    }
+    
+    // Prevent whitespace in password fields
+    if (name === 'password' || name === 'confirmPassword') {
+      finalValue = value.replace(/\s/g, '');
     }
 
     setFormData(prev => ({
@@ -78,6 +87,7 @@ const Signup = () => {
 
     if (!formData.password) newErrors.password = 'Password is required';
     else if (!validatePassword(formData.password)) newErrors.password = 'Password must be minimum 8 characters with at least 1 number and 1 special character';
+    else if (/\s/.test(formData.password)) newErrors.password = 'Password cannot contain whitespace';
 
     if (!formData.confirmPassword) newErrors.confirmPassword = 'Confirm password is required';
     else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';

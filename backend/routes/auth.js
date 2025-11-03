@@ -56,6 +56,13 @@ router.post("/signup/send-otp", async (req, res) => {
       });
     }
 
+    // Check for whitespace in password
+    if (/\s/.test(password)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password cannot contain whitespace" 
+      });
+    }
    
     if (password.length < 8) {
       return res.status(400).json({ 
@@ -139,6 +146,31 @@ router.post("/signup/verify-otp", async (req, res) => {
       return res.status(400).json({ 
         success: false,
         message: "Please provide all required fields" 
+      });
+    }
+
+    // Check for whitespace in password
+    if (/\s/.test(password)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password cannot contain whitespace" 
+      });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password must be at least 8 characters" 
+      });
+    }
+
+    const hasNumber = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    if (!hasNumber || !hasSpecialChar) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password must contain at least 1 number and 1 special character" 
       });
     }
 
@@ -245,6 +277,16 @@ router.post("/login/send-otp", async (req, res) => {
       });
     }
 
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been archived by an administrator",
+        isArchived: true,
+        archivedAt: user.archivedAt || null
+      });
+    }
+
     const otpCode = PasswordReset.generateOTP();
     
     await PasswordReset.deleteMany({ email: cleanEmail });
@@ -312,10 +354,25 @@ router.post("/login/verify-otp", async (req, res) => {
       });
     }
 
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been archived by an administrator",
+        isArchived: true,
+        archivedAt: user.archivedAt || null
+      });
+    }
+
     otpRecord.isUsed = true;
     await otpRecord.save();
 
     const token = generateToken(user._id);
+
+    // Set user as online and update lastActivity
+    user.isOnline = true;
+    user.lastActivity = new Date();
+    await user.save({ validateBeforeSave: false });
 
     console.log("LOGIN SUCCESSFUL for user:", user._id);
     
@@ -384,6 +441,14 @@ router.post("/signup", async (req, res) => {
       return res.status(400).json({ 
         success: false,
         message: "Passwords do not match" 
+      });
+    }
+
+    // Check for whitespace in password
+    if (/\s/.test(password)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password cannot contain whitespace" 
       });
     }
 
@@ -501,7 +566,22 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been archived by an administrator",
+        isArchived: true,
+        archivedAt: user.archivedAt || null
+      });
+    }
+
     const token = generateToken(user._id);
+
+    // Set user as online and update lastActivity
+    user.isOnline = true;
+    user.lastActivity = new Date();
+    await user.save({ validateBeforeSave: false });
 
     console.log("LOGIN SUCCESSFUL for user:", user._id);
     
@@ -551,6 +631,22 @@ router.get("/me", async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'User not found'
+      });
+    }
+
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been archived by an administrator",
+        isArchived: true,
+        user: {
+          _id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          archivedAt: user.archivedAt || null
+        }
       });
     }
 
@@ -632,8 +728,23 @@ router.post("/google", async (req, res) => {
       });
     }
 
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been archived by an administrator",
+        isArchived: true,
+        archivedAt: user.archivedAt || null
+      });
+    }
+
     // Generate token for Google user
     const token = generateToken(user._id);
+
+    // Set user as online and update lastActivity
+    user.isOnline = true;
+    user.lastActivity = new Date();
+    await user.save({ validateBeforeSave: false });
 
     // Log user login activity for Google login
     try {
@@ -897,6 +1008,11 @@ router.post("/logout", async (req, res) => {
       const user = await User.findById(decoded.id);
       
       if (user) {
+        // Set user as offline and clear lastActivity
+        user.isOnline = false;
+        user.lastActivity = null;
+        await user.save({ validateBeforeSave: false });
+        
         // Log user logout activity
         try {
           const logoutReason = reason === 'inactivity' ? 'Session expired due to inactivity' : 'Logged out successfully';
@@ -933,6 +1049,56 @@ router.post("/logout", async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Logged out successfully"
+    });
+  }
+});
+
+// Heartbeat endpoint - updates user's lastActivity timestamp
+router.post("/heartbeat", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required"
+      });
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+      const user = await User.findById(decoded.id);
+      
+      if (user) {
+        // Update lastActivity and set isOnline
+        user.lastActivity = new Date();
+        user.isOnline = true;
+        await user.save({ validateBeforeSave: false });
+        
+        return res.status(200).json({
+          success: true,
+          message: "Heartbeat updated",
+          lastActivity: user.lastActivity
+        });
+      }
+    } catch (tokenError) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token"
+      });
+    }
+
+    return res.status(404).json({
+      success: false,
+      message: "User not found"
+    });
+
+  } catch (error) {
+    console.error("HEARTBEAT ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error during heartbeat",
+      error: error.message
     });
   }
 });

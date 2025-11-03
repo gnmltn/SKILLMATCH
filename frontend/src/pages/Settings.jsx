@@ -183,9 +183,17 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
 
   const handleSaveChanges = async () => {
     // Validate password changes
-    if (newPassword && newPassword !== confirmPassword) {
-      toast.error('New passwords do not match!');
-      return;
+    if (newPassword) {
+      // Check for whitespace in password
+      if (/\s/.test(newPassword)) {
+        toast.error('Password cannot contain whitespace');
+        return;
+      }
+      
+      if (newPassword !== confirmPassword) {
+        toast.error('New passwords do not match!');
+        return;
+      }
     }
     if ((newEmail || newPassword) && !currentPassword) {
       toast.error('Current password is required to make email or password changes!');
@@ -302,7 +310,7 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
               <input
                 type={showPasswords.new ? 'text' : 'password'}
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => setNewPassword(e.target.value.replace(/\s/g, ''))}
                 placeholder="••••••••"
                 className="w-full px-3 py-2.5 pr-10 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm bg-card text-card-foreground"
               />
@@ -323,7 +331,7 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
               <input
                 type={showPasswords.confirm ? 'text' : 'password'}
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => setConfirmPassword(e.target.value.replace(/\s/g, ''))}
                 placeholder="••••••••"
                 className="w-full px-3 py-2.5 pr-10 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm bg-card text-card-foreground"
               />

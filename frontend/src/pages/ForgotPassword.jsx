@@ -109,6 +109,12 @@ const ForgotPassword = () => {
       return;
     }
 
+    // Check for whitespace in password
+    if (/\s/.test(newPassword)) {
+      setError('Password cannot contain whitespace');
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -365,7 +371,7 @@ const ForgotPassword = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => {
-                    setNewPassword(e.target.value);
+                    setNewPassword(e.target.value.replace(/\s/g, ''));
                     setError('');
                   }}
                   placeholder="Enter new password"
@@ -394,7 +400,7 @@ const ForgotPassword = () => {
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => {
-                    setConfirmPassword(e.target.value);
+                    setConfirmPassword(e.target.value.replace(/\s/g, ''));
                     setError('');
                   }}
                   placeholder="Confirm new password"

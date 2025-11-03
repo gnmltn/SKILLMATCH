@@ -100,10 +100,11 @@ router.put('/profile', adminAuth, async (req, res) => {
     let admin;
     
     // Check if admin is from Admin collection or User collection
+    // Fetch with password selected for password verification
     if (req.user.constructor.modelName === 'Admin') {
       admin = await Admin.findById(req.user._id);
     } else {
-      admin = await User.findById(req.user._id);
+      admin = await User.findById(req.user._id).select('+password');
     }
 
     if (!admin) {
@@ -132,18 +133,34 @@ router.put('/profile', adminAuth, async (req, res) => {
     }
 
     // Update fields
-    if (name) admin.name = name;
+    if (name) {
+      // Parse name into firstName and lastName
+      const nameParts = name.trim().split(' ');
+      if (nameParts.length > 0) {
+        admin.firstName = nameParts[0];
+        admin.lastName = nameParts.slice(1).join(' ') || '';
+      }
+    }
     if (email) admin.email = email;
-    if (newPassword) admin.password = newPassword;
+    if (newPassword) {
+      // Check for whitespace in password
+      if (/\s/.test(newPassword)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password cannot contain whitespace'
+        });
+      }
+      admin.password = newPassword;
+    }
 
     await admin.save();
 
-    // Format response
+    // Format response - use firstName and lastName for User model
     const userResponse = {
       _id: admin._id,
-      name: admin.name,
+      name: admin.name || `${admin.firstName || ''} ${admin.lastName || ''}`.trim(),
       email: admin.email,
-      profilePicture: admin.profilePicture,
+      profilePicture: admin.profilePicture || '',
       isAdmin: true
     };
 
@@ -206,13 +223,14 @@ router.post('/profile/picture', adminAuth, upload.single('profilePicture'), asyn
     // Format response
     const userResponse = {
       _id: admin._id,
-      name: admin.name || `${admin.firstName} ${admin.lastName}`,
+      name: admin.name || `${admin.firstName || ''} ${admin.lastName || ''}`.trim(),
       email: admin.email,
-      profilePicture: admin.profilePicture,
+      profilePicture: admin.profilePicture || '',
       isAdmin: true
     };
 
     console.log('✅ Profile picture updated:', userResponse.profilePicture);
+    console.log('✅ Full user response:', userResponse);
 
     // Log the activity
     await ActivityLog.create({
@@ -581,26 +599,56 @@ router.get('/users', adminAuth, async (req, res) => {
     console.log('🔍 Fetching users with filters:', { page, limit, search, status });
 
     // Build filter object
-    const filter = { userType: 'student' };
+    const filter = { 
+      userType: 'student',
+      $and: []
+    };
+
+    // Handle Suspended status differently - show archived users
+    if (status === 'Suspended') {
+      // For Suspended, include only archived users
+      filter.$and.push({ isArchived: true });
+    } else {
+      // For other statuses, exclude archived users
+      filter.$and.push({
+        $or: [
+          { isArchived: false },
+          { isArchived: { $exists: false } }
+        ]
+      });
+    }
     
     // Search filter
     if (search) {
-      filter.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
-      ];
+      filter.$and.push({
+        $or: [
+          { firstName: { $regex: search, $options: 'i' } },
+          { lastName: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ]
+      });
     }
 
-    // Status filter
-    if (status !== 'all') {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Status filter (only for Active/Inactive, not Suspended)
+    if (status !== 'all' && status !== 'Suspended') {
+      const tenSecondsAgo = new Date(Date.now() - 10 * 1000); // 10 seconds ago
       
       if (status === 'Active') {
-        filter.updatedAt = { $gte: thirtyDaysAgo };
+        filter.$and.push({
+          $and: [
+            { lastActivity: { $gte: tenSecondsAgo } },
+            { isOnline: true }
+          ]
+        });
       } else if (status === 'Inactive') {
-        filter.updatedAt = { $lt: thirtyDaysAgo };
+        filter.$and.push({
+          $or: [
+            { lastActivity: { $exists: false } },
+            { lastActivity: null },
+            { lastActivity: { $lt: tenSecondsAgo } },
+            { isOnline: false }
+          ]
+        });
       }
     }
 
@@ -609,7 +657,7 @@ router.get('/users', adminAuth, async (req, res) => {
     
     // Get users with pagination
     const users = await User.find(filter)
-      .select('firstName lastName email createdAt updatedAt userType')
+      .select('firstName lastName email createdAt updatedAt userType lastActivity isOnline isArchived')
       .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -624,8 +672,8 @@ router.get('/users', adminAuth, async (req, res) => {
       name: `${user.firstName} ${user.lastName}`,
       email: user.email,
       joinDate: user.createdAt.toLocaleDateString(),
-      lastLogin: getTimeAgo(user.updatedAt),
-      status: getStatusFromLastActivity(user.updatedAt),
+      lastLogin: getTimeAgo(user.lastActivity || user.updatedAt),
+      status: user.isArchived ? 'Suspended' : getStatusFromLastActivity(user.lastActivity),
       type: user.userType || 'student'
     }));
 
@@ -705,7 +753,7 @@ router.put('/users/:id', adminAuth, async (req, res) => {
           id: user._id,
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
-          status: getStatusFromLastActivity(user.updatedAt),
+          status: getStatusFromLastActivity(user.lastActivity),
           type: user.userType
         }
       }
@@ -721,12 +769,211 @@ router.put('/users/:id', adminAuth, async (req, res) => {
   }
 });
 
-// DELETE USER
+// ARCHIVE USER (instead of deleting)
+router.post('/users/:id/archive', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log('🔍 Archiving user:', id);
+
+    // Find user first to get details for logging
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Prevent archiving admin users
+    if (user.isAdmin || user.userType === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot archive admin users'
+      });
+    }
+
+    // Check if already archived
+    if (user.isArchived) {
+      return res.status(400).json({
+        success: false,
+        message: 'User is already archived'
+      });
+    }
+
+    // Archive user
+    user.isArchived = true;
+    user.archivedAt = new Date();
+    await user.save();
+
+    // Log the activity
+    await ActivityLog.create({
+      user: `Admin: ${req.user.firstName} ${req.user.lastName}`,
+      action: `Archived user ${user.firstName} ${user.lastName} (${user.email})`,
+      type: 'user_management',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      metadata: {
+        userId: user._id,
+        userEmail: user.email
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'User archived successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Archive user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error archiving user',
+      error: error.message
+    });
+  }
+});
+
+// GET ARCHIVED USERS
+router.get('/users/archived', adminAuth, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      sortBy = 'archivedAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    console.log('🔍 Fetching archived users with filters:', { page, limit, search });
+
+    // Build filter object - only archived users
+    const filter = { userType: 'student', isArchived: true };
+    
+    // Search filter
+    if (search) {
+      filter.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+    
+    // Get archived users with pagination
+    const users = await User.find(filter)
+      .select('firstName lastName email createdAt updatedAt userType archivedAt lastActivity isOnline')
+      .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get total count for pagination
+    const totalUsers = await User.countDocuments(filter);
+    const totalPages = Math.ceil(totalUsers / limit);
+
+    // Format users for frontend
+    const formattedUsers = users.map(user => ({
+      id: user._id,
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      joinDate: user.createdAt.toLocaleDateString(),
+      archivedAt: user.archivedAt ? user.archivedAt.toLocaleDateString() : 'N/A',
+      lastLogin: getTimeAgo(user.lastActivity || user.updatedAt),
+      status: getStatusFromLastActivity(user.lastActivity),
+      type: user.userType || 'student'
+    }));
+
+    console.log('✅ Archived users found:', formattedUsers.length);
+
+    res.json({
+      success: true,
+      data: {
+        users: formattedUsers,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalUsers,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Get archived users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching archived users',
+      error: error.message
+    });
+  }
+});
+
+// RESTORE ARCHIVED USER
+router.post('/users/:id/restore', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log('🔍 Restoring user:', id);
+
+    // Find user
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if user is archived
+    if (!user.isArchived) {
+      return res.status(400).json({
+        success: false,
+        message: 'User is not archived'
+      });
+    }
+
+    // Restore user
+    user.isArchived = false;
+    user.archivedAt = null;
+    await user.save();
+
+    // Log the activity
+    await ActivityLog.create({
+      user: `Admin: ${req.user.firstName} ${req.user.lastName}`,
+      action: `Restored user ${user.firstName} ${user.lastName} (${user.email})`,
+      type: 'user_management',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      metadata: {
+        userId: user._id,
+        userEmail: user.email
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'User restored successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Restore user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error restoring user',
+      error: error.message
+    });
+  }
+});
+
+// PERMANENTLY DELETE ARCHIVED USER
 router.delete('/users/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
-    console.log('🔍 Deleting user:', id);
+    console.log('🔍 Permanently deleting user:', id);
 
     // Find user first to get details for logging
     const user = await User.findById(id);
@@ -745,13 +992,21 @@ router.delete('/users/:id', adminAuth, async (req, res) => {
       });
     }
 
-    // Delete user
+    // Only allow permanent delete if user is archived
+    if (!user.isArchived) {
+      return res.status(400).json({
+        success: false,
+        message: 'User must be archived before permanent deletion. Use archive endpoint first.'
+      });
+    }
+
+    // Permanently delete user
     await User.findByIdAndDelete(id);
 
     // Log the activity
     await ActivityLog.create({
       user: `Admin: ${req.user.firstName} ${req.user.lastName}`,
-      action: `Deleted user ${user.firstName} ${user.lastName} (${user.email})`,
+      action: `Permanently deleted user ${user.firstName} ${user.lastName} (${user.email})`,
       type: 'user_management',
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),
@@ -763,7 +1018,7 @@ router.delete('/users/:id', adminAuth, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'User deleted successfully'
+      message: 'User permanently deleted successfully'
     });
 
   } catch (error) {
@@ -1095,10 +1350,14 @@ function getSkillCategory(skillName) {
 
 // ========== HELPER FUNCTIONS ==========
 function getStatusFromLastActivity(lastActivity) {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  if (!lastActivity) {
+    return 'Inactive';
+  }
   
-  return lastActivity >= thirtyDaysAgo ? 'Active' : 'Inactive';
+  const now = new Date();
+  const tenSecondsAgo = new Date(now.getTime() - 10 * 1000); // 10 seconds ago
+  
+  return lastActivity >= tenSecondsAgo ? 'Active' : 'Inactive';
 }
 
 function getTimeAgo(date) {

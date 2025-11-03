@@ -9,7 +9,21 @@ import {
   Trash2,
   User,
   X,
-  Briefcase
+  Briefcase,
+  Layout,
+  Server,
+  BarChart3,
+  Database,
+  Smartphone,
+  Shield,
+  Cloud,
+  Brain,
+  TestTube2,
+  Cpu,
+  Network,
+  Globe,
+  Code,
+  Palette
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -18,6 +32,57 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:5000/api';
+
+// Icon mapping for career paths - ONLY CHANGE MADE
+const getCareerIcon = (careerTitle) => {
+  const title = careerTitle.toLowerCase();
+  
+  if (title.includes('frontend') && !title.includes('ui') && !title.includes('ux')) {
+    return <Layout className="h-8 w-8 text-blue-500" />;
+  }
+  if (title.includes('ui') || title.includes('ux') || title.includes('design')) {
+    return <Palette className="h-8 w-8 text-pink-500" />;
+  }
+  if (title.includes('backend') || title.includes('api') || title.includes('server') || title.includes('architecture')) {
+    return <Server className="h-8 w-8 text-green-500" />;
+  }
+  if (title.includes('data') || title.includes('analyst') || title.includes('analytics') || title.includes('science')) {
+    return <BarChart3 className="h-8 w-8 text-purple-500" />;
+  }
+  if (title.includes('database') || title.includes('dba') || title.includes('sql') || title.includes('mongodb')) {
+    return <Database className="h-8 w-8 text-orange-500" />;
+  }
+  if (title.includes('mobile') || title.includes('ios') || title.includes('android') || title.includes('react native')) {
+    return <Smartphone className="h-8 w-8 text-indigo-500" />;
+  }
+  if (title.includes('security') || title.includes('cyber') || title.includes('penetration') || title.includes('infosec')) {
+    return <Shield className="h-8 w-8 text-red-500" />;
+  }
+  if (title.includes('cloud') || title.includes('devops') || title.includes('aws') || title.includes('azure')) {
+    return <Cloud className="h-8 w-8 text-cyan-500" />;
+  }
+  if (title.includes('ai') || title.includes('machine learning') || title.includes('ml') || title.includes('neural')) {
+    return <Brain className="h-8 w-8 text-pink-600" />;
+  }
+  if (title.includes('qa') || title.includes('testing') || title.includes('test') || title.includes('quality')) {
+    return <TestTube2 className="h-8 w-8 text-yellow-500" />;
+  }
+  if (title.includes('full stack') || title.includes('fullstack') || title.includes('full-stack')) {
+    return <Cpu className="h-8 w-8 text-teal-500" />;
+  }
+  if (title.includes('network') || title.includes('infrastructure') || title.includes('sysadmin')) {
+    return <Network className="h-8 w-8 text-lime-500" />;
+  }
+  if (title.includes('web') || title.includes('developer') || title.includes('programming')) {
+    return <Globe className="h-8 w-8 text-blue-500" />;
+  }
+  if (title.includes('software') || title.includes('engineer') || title.includes('development')) {
+    return <Code className="h-8 w-8 text-blue-600" />;
+  }
+  
+  // Default icon for other careers
+  return <Briefcase className="h-8 w-8 text-gray-500" />;
+};
 
 export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -85,7 +150,8 @@ export default function Dashboard() {
           .map(career => ({
             id: career.id,
             title: career.title,
-            emoji: career.icon || '💼',
+            // ONLY CHANGE: Replace emoji with icon component
+            icon: getCareerIcon(career.title),
             subtitle: getCareerSubtitle(career.matchPercentage),
             matchScore: career.matchPercentage,
             color: getMatchScoreColor(career.matchPercentage)
@@ -522,7 +588,8 @@ export default function Dashboard() {
               {careerMatches.map((career) => (
                 <div key={career.id} className="bg-card rounded-xl border border-border p-6 hover:shadow-md transition-all duration-200">
                   <div className="flex items-center gap-4 mb-4">
-                    <span className="text-3xl">{career.emoji}</span>
+                    {/* ONLY CHANGE: Replace emoji with icon component */}
+                    {career.icon}
                     <div>
                       <h4 className="text-lg font-semibold text-card-foreground">{career.title}</h4>
                       <p className="text-sm text-muted-foreground">{career.subtitle}</p>

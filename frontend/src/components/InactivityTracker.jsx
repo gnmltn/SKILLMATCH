@@ -85,8 +85,23 @@ export default function InactivityTracker() {
         timeoutRef.current = null;
       }
 
-      // Check if user is logged in - use appropriate token based on route
+      // Check if user is on a public route FIRST - don't do any tracking on public routes
       const currentPath = locationRef.current;
+      const isPublicRoute = PUBLIC_ROUTES.some(route => {
+        // Exact match for root path
+        if (route === '/') {
+          return currentPath === '/' || currentPath === '/landing';
+        }
+        // Exact match or starts with for other routes (but not just '/')
+        return currentPath === route || currentPath.startsWith(route + '/');
+      });
+      
+      if (isPublicRoute) {
+        console.log('⏸️ On public route (' + currentPath + '), stopping inactivity tracking');
+        return; // Don't track inactivity on public routes
+      }
+
+      // Check if user is logged in - use appropriate token based on route
       const isAdmin = isAdminRouteRef.current || localStorage.getItem('isAdmin') === 'true';
       
       // Use adminToken for admin routes, token for student routes
@@ -103,21 +118,6 @@ export default function InactivityTracker() {
       if (!isAdmin) {
         console.log('⏸️ Regular user session - inactivity tracking disabled');
         return; // Don't track inactivity for regular users
-      }
-
-      // Check if user is on a public route
-      const isPublicRoute = PUBLIC_ROUTES.some(route => {
-        // Exact match for root path
-        if (route === '/') {
-          return currentPath === '/' || currentPath === '/landing';
-        }
-        // Exact match or starts with for other routes (but not just '/')
-        return currentPath === route || currentPath.startsWith(route + '/');
-      });
-      
-      if (isPublicRoute) {
-        console.log('⏸️ On public route (' + currentPath + '), stopping inactivity tracking');
-        return; // Don't track inactivity on public routes
       }
 
       console.log('✅ Tracking inactivity on protected route:', currentPath, '(Admin)');
@@ -143,6 +143,19 @@ export default function InactivityTracker() {
       // Only process activity if at least 1 second has passed since last activity
       // This prevents rapid-fire resets
       if (timeSinceLastActivity >= 1000) {
+        // Check if we're on a public route first - don't track activity on public routes
+        const currentPath = locationRef.current;
+        const isPublicRoute = PUBLIC_ROUTES.some(route => {
+          if (route === '/') {
+            return currentPath === '/' || currentPath === '/landing';
+          }
+          return currentPath === route || currentPath.startsWith(route + '/');
+        });
+        
+        if (isPublicRoute) {
+          return; // Don't track activity on public routes
+        }
+        
         const isAdmin = isAdminRouteRef.current || localStorage.getItem('isAdmin') === 'true';
         // Only track activity for admin users
         if (isAdmin) {

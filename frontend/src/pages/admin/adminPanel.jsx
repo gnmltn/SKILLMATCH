@@ -54,10 +54,13 @@ import {
   Palette,
   Zap,
   Filter,
-  Info
+  Info,
+  Archive,
+  RotateCcw
 } from "lucide-react";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useTheme } from "../../contexts/ThemeContext";
 import logo from "../../assets/logo.png";
 
 // ========== 100% WORKING API FUNCTIONS ==========
@@ -182,12 +185,35 @@ const updateUser = async (userId, userData) => {
   return data.data;
 };
 
+const archiveUser = async (userId) => {
+  console.log('🔄 Archiving user:', userId);
+  const data = await apiCall(`${API_BASE}/users/${userId}/archive`, {
+    method: 'POST'
+  });
+  return data;
+};
+
+const restoreUser = async (userId) => {
+  console.log('🔄 Restoring user:', userId);
+  const data = await apiCall(`${API_BASE}/users/${userId}/restore`, {
+    method: 'POST'
+  });
+  return data;
+};
+
 const deleteUser = async (userId) => {
-  console.log('🔄 Deleting user:', userId);
+  console.log('🔄 Permanently deleting user:', userId);
   const data = await apiCall(`${API_BASE}/users/${userId}`, {
     method: 'DELETE'
   });
   return data;
+};
+
+const fetchArchivedUsers = async (filters = {}) => {
+  console.log('🔄 Fetching archived users with filters:', filters);
+  const queryParams = new URLSearchParams(filters).toString();
+  const data = await apiCall(`${API_BASE}/users/archived?${queryParams}`);
+  return data.data;
 };
 
 
@@ -324,6 +350,7 @@ const Sidebar = ({ activePage, setActivePage, adminUser }) => {
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "manage-users", label: "Manage Users", icon: Users },
+    { id: "archive", label: "Archive", icon: Archive },
     { id: "activity-log", label: "Activity Log", icon: Activity },
     { id: "settings", label: "Settings", icon: Sliders },
   ];
@@ -357,11 +384,18 @@ const Sidebar = ({ activePage, setActivePage, adminUser }) => {
         <div className="flex items-center gap-3">
           {adminUser?.profilePicture ? (
             <img
-              src={adminUser.profilePicture}
+              src={adminUser.profilePicture.startsWith('http') 
+                ? adminUser.profilePicture 
+                : `http://localhost:5000${adminUser.profilePicture}`}
               alt="Admin"
               className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+              onError={(e) => {
+                // Fallback to initials if image fails to load
+                e.target.style.display = 'none';
+              }}
             />
-          ) : (
+          ) : null}
+          {!adminUser?.profilePicture && (
             <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
               {getInitials(adminUser?.name || 'Admin')}
             </div>
@@ -855,7 +889,47 @@ useEffect(() => {
   );
 };
 
-// ========== DELETE USER MODAL ==========
+// ========== ARCHIVE USER MODAL ==========
+const ArchiveUserModal = ({ isOpen, onClose, user, onConfirm }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md">
+        <div className="text-center">
+          <Archive className="w-12 h-12 text-orange-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Archive User
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-2">
+            Are you sure you want to archive this user?
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            The user will be moved to the archive section. You can restore or permanently delete them from there.
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-600 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(user)}
+            className="flex-1 bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700 transition flex items-center justify-center gap-2"
+          >
+            <Archive className="w-4 h-4" />
+            Archive User
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ========== DELETE USER MODAL (for permanent deletion from archive) ==========
 const DeleteUserModal = ({ isOpen, onClose, user, onConfirm }) => {
   if (!isOpen) return null;
 
@@ -865,7 +939,7 @@ const DeleteUserModal = ({ isOpen, onClose, user, onConfirm }) => {
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            Delete User
+            Permanently Delete User
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-2">
             Are you absolutely sure?
@@ -887,7 +961,47 @@ const DeleteUserModal = ({ isOpen, onClose, user, onConfirm }) => {
             className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2"
           >
             <Trash2 className="w-4 h-4" />
-            Delete User
+            Delete Permanently
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ========== RESTORE USER MODAL ==========
+const RestoreUserModal = ({ isOpen, onClose, user, onConfirm }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md">
+        <div className="text-center">
+          <RotateCcw className="w-12 h-12 text-green-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Restore User
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-2">
+            Are you sure you want to restore this user?
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            The user will be restored and can log in again. They will appear in the Manage Users section.
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-600 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(user)}
+            className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Restore User
           </button>
         </div>
       </div>
@@ -1019,6 +1133,7 @@ const ManageUsers = () => {
   });
   const [selectedUser, setSelectedUser] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     status: "all",
@@ -1094,6 +1209,23 @@ const ManageUsers = () => {
     }
   };
 
+  const handleArchive = (user) => {
+    setSelectedUser(user);
+    setIsArchiveModalOpen(true);
+  };
+
+  const handleConfirmArchive = async (user) => {
+    try {
+      await archiveUser(user.id);
+      toast.success('User archived successfully');
+      setIsArchiveModalOpen(false);
+      loadUsers();
+    } catch (error) {
+      console.error('❌ Error archiving user:', error);
+      toast.error('Failed to archive user');
+    }
+  };
+
   const handleDelete = (user) => {
     setSelectedUser(user);
     setIsDeleteModalOpen(true);
@@ -1102,7 +1234,7 @@ const ManageUsers = () => {
   const handleConfirmDelete = async (user) => {
     try {
       await deleteUser(user.id);
-      toast.success('User deleted successfully');
+      toast.success('User permanently deleted successfully');
       setIsDeleteModalOpen(false);
       loadUsers();
     } catch (error) {
@@ -1250,12 +1382,13 @@ const ManageUsers = () => {
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        {user.type !== 'admin' && (
+                        {user.type !== 'admin' && user.status !== 'Suspended' && (
                           <button 
-                            onClick={() => handleDelete(user)}
-                            className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
+                            onClick={() => handleArchive(user)}
+                            className="p-1 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition"
+                            title="Archive user"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Archive className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -1314,6 +1447,285 @@ const ManageUsers = () => {
         onClose={() => setIsEditModalOpen(false)}
         user={selectedUser}
         onSave={handleUpdate}
+      />
+
+      <ArchiveUserModal
+        isOpen={isArchiveModalOpen}
+        onClose={() => setIsArchiveModalOpen(false)}
+        user={selectedUser}
+        onConfirm={handleConfirmArchive}
+      />
+    </div>
+  );
+};
+
+// ========== ARCHIVE COMPONENT ==========
+const ArchiveUsers = () => {
+  const [users, setUsers] = useState([]);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalUsers: 0,
+    hasNext: false,
+    hasPrev: false
+  });
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    page: 1,
+    limit: 10
+  });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadArchivedUsers();
+  }, [filters]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setFilters(prev => ({ 
+        ...prev, 
+        page: 1,
+        search: searchTerm || undefined 
+      }));
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  const loadArchivedUsers = async () => {
+    try {
+      setLoading(true);
+      const queryFilters = {
+        ...filters,
+        search: searchTerm || undefined
+      };
+      
+      Object.keys(queryFilters).forEach(key => {
+        if (queryFilters[key] === undefined) {
+          delete queryFilters[key];
+        }
+      });
+      
+      console.log('🔄 Loading archived users with filters:', queryFilters);
+      
+      const usersData = await fetchArchivedUsers(queryFilters);
+      console.log('✅ Archived users data received:', usersData);
+      
+      setUsers(usersData.users || []);
+      setPagination(usersData.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalUsers: usersData.users?.length || 0,
+        hasNext: false,
+        hasPrev: false
+      });
+    } catch (error) {
+      console.error('❌ Error loading archived users:', error);
+      toast.error('Failed to load archived users');
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestore = (user) => {
+    setSelectedUser(user);
+    setIsRestoreModalOpen(true);
+  };
+
+  const handleConfirmRestore = async (user) => {
+    try {
+      await restoreUser(user.id);
+      toast.success('User restored successfully');
+      setIsRestoreModalOpen(false);
+      loadArchivedUsers();
+    } catch (error) {
+      console.error('❌ Error restoring user:', error);
+      toast.error('Failed to restore user');
+    }
+  };
+
+  const handleDelete = (user) => {
+    setSelectedUser(user);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async (user) => {
+    try {
+      await deleteUser(user.id);
+      toast.success('User permanently deleted successfully');
+      setIsDeleteModalOpen(false);
+      loadArchivedUsers();
+    } catch (error) {
+      console.error('❌ Error deleting user:', error);
+      toast.error('Failed to delete user');
+    }
+  };
+
+  const handlePageChange = (newPage) => {
+    setFilters(prev => ({
+      ...prev,
+      page: newPage
+    }));
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Archive</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Manage archived user accounts</p>
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">Archived Users</h2>
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
+            Restore archived users or permanently delete them
+          </p>
+        </div>
+
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search archived users by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {/* Archived Users Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Join Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Archived Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="px-4 py-8 text-center">
+                    <div className="flex items-center justify-center">
+                      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                      <span className="text-gray-500 dark:text-gray-400">Loading archived users...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : users.length > 0 ? users.map((user) => {
+                const RoleIcon = getRoleIcon(user.type);
+                return (
+                  <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${getRoleColor(user.type)}`}>
+                          <RoleIcon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user.type}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-white">
+                        <Mail className="w-4 h-4 text-gray-400" />
+                        {user.email}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                        <Calendar className="w-4 h-4" />
+                        {user.joinDate}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {user.archivedAt}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleRestore(user)}
+                          className="p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition"
+                          title="Restore user"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(user)}
+                          className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
+                          title="Permanently delete user"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }) : (
+                <tr>
+                  <td colSpan="5" className="px-4 py-8 text-center">
+                    <div className="text-center py-4">
+                      <Archive className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500 dark:text-gray-400">
+                        {searchTerm ? 'No archived users found matching your search' : 'No archived users'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Table Footer */}
+        <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Showing {users.length} of {pagination.totalUsers} archived users
+          </p>
+          
+          {pagination.totalPages > 1 && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => handlePageChange(pagination.currentPage - 1)}
+                disabled={!pagination.hasPrev}
+                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400">
+                Page {pagination.currentPage} of {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(pagination.currentPage + 1)}
+                disabled={!pagination.hasNext}
+                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modals */}
+      <RestoreUserModal
+        isOpen={isRestoreModalOpen}
+        onClose={() => setIsRestoreModalOpen(false)}
+        user={selectedUser}
+        onConfirm={handleConfirmRestore}
       />
 
       <DeleteUserModal
@@ -2005,7 +2417,15 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
         newPassword: '',
         confirmPassword: '',
       });
-      setProfilePreview(user.profilePicture || '');
+      // Update profilePreview with proper URL formatting
+      if (user.profilePicture) {
+        const imageUrl = user.profilePicture.startsWith('http') 
+          ? user.profilePicture 
+          : `http://localhost:5000${user.profilePicture}`;
+        setProfilePreview(imageUrl);
+      } else {
+        setProfilePreview('');
+      }
     }
   }, [user]);
 
@@ -2047,13 +2467,31 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
       // REAL API CALL
       const response = await uploadProfilePicture(profilePicture);
       
+      console.log('📸 Upload response:', response);
+      
       // Update user state with response from API
       setUser(response);
       
+      // Update profilePreview to use the new image URL from the server
+      // If response has profilePicture, use it; otherwise keep the preview
+      if (response.profilePicture) {
+        // If it's a relative path, prepend the backend URL
+        const imageUrl = response.profilePicture.startsWith('http') 
+          ? response.profilePicture 
+          : `http://localhost:5000${response.profilePicture}`;
+        setProfilePreview(imageUrl);
+        console.log('🖼️ Set profile preview to:', imageUrl);
+      }
+      
       // Update localStorage (use adminUser for admin sessions)
       const storedUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
-      const updatedStoredUser = { ...storedUser, ...response };
+      const updatedStoredUser = { 
+        ...storedUser, 
+        ...response,
+        profilePicture: response.profilePicture // Ensure profilePicture is included
+      };
       localStorage.setItem('adminUser', JSON.stringify(updatedStoredUser));
+      console.log('💾 Updated localStorage:', updatedStoredUser);
       
       toast.success('Profile picture updated successfully!');
       
@@ -2136,6 +2574,12 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
 
     // Validate passwords if changing
     if (formData.newPassword) {
+      // Check for whitespace in password
+      if (/\s/.test(formData.newPassword)) {
+        toast.error('Password cannot contain whitespace');
+        return false;
+      }
+      
       if (formData.newPassword.length < 8) {
         toast.error('New password must be at least 8 characters long');
         return false;
@@ -2715,20 +3159,17 @@ const SettingsPage = ({ darkMode, toggleDarkMode, adminUser, setAdminUser }) => 
 
 // ========== MAIN ADMIN PANEL COMPONENT ==========
 const AdminPanel = () => {
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved !== null ? JSON.parse(saved) : window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isDarkMode: darkMode, toggleDarkMode } = useTheme();
   const [activePage, setActivePage] = useState("dashboard");
   const [adminUser, setAdminUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-
-  const toggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    localStorage.setItem('darkMode', JSON.stringify(newDarkMode));
-  };
+  
+  // Early return if we're on the login page (shouldn't happen, but prevents rendering)
+  if (location.pathname === '/admin/adminLogin') {
+    return null;
+  }
 
   const loadAdminProfile = async () => {
     try {
@@ -2739,15 +3180,35 @@ const AdminPanel = () => {
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         console.log('📁 Loaded user from localStorage:', userData);
+        // Format profile picture URL if needed
+        if (userData.profilePicture && !userData.profilePicture.startsWith('http')) {
+          userData.profilePicture = `http://localhost:5000${userData.profilePicture}`;
+        }
         setAdminUser(userData);
       }
 
-      // Then try to fetch from API
+      // Then try to fetch from API (this will override localStorage with fresh data)
       try {
         const profile = await fetchAdminProfileData();
-        console.log('🌐 Loaded user from API:', profile);
+        console.log('🌐 Loaded user from API (raw):', profile);
+        
+        // Ensure admin fields are set correctly
+        if (!profile.isAdmin && profile.role !== 'admin' && profile.userType !== 'admin') {
+          profile.isAdmin = true;
+          profile.role = 'admin';
+        }
+        
+        // Format profile picture URL for display only
+        if (profile.profilePicture) {
+          profile.profilePicture = profile.profilePicture.startsWith('http') 
+            ? profile.profilePicture 
+            : `http://localhost:5000${profile.profilePicture}`;
+        }
+        
         setAdminUser(profile);
+        // Store formatted URL in localStorage for quick access
         localStorage.setItem('adminUser', JSON.stringify(profile));
+        console.log('✅ Profile loaded and saved:', profile);
       } catch (apiError) {
         console.warn('⚠️ Could not fetch admin profile from API, using stored data:', apiError);
         // Continue with stored data
@@ -2766,6 +3227,14 @@ const AdminPanel = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
+      // Don't run auth check if we're already on the login page
+      // This prevents toasts from showing when AdminPanel accidentally mounts
+      if (location.pathname === '/admin/adminLogin') {
+        console.log('⏸️ Already on login page, skipping auth check');
+        setLoading(false);
+        return;
+      }
+
       console.log('🔐 Checking authentication...');
       
       // First check: if regular user is logged in (but not admin), redirect to dashboard
@@ -2787,8 +3256,11 @@ const AdminPanel = () => {
       
       if (!token || !user) {
         console.error('❌ No token or user, redirecting to login');
-        toast.error('Please login as admin first');
-        navigate('/admin/adminLogin');
+        // Only show toast if we're actually on the admin panel route
+        if (location.pathname === '/admin/adminPanel') {
+          toast.error('Please login as admin first');
+        }
+        navigate('/admin/adminLogin', { replace: true });
         return;
       }
 
@@ -2796,10 +3268,16 @@ const AdminPanel = () => {
         const userData = JSON.parse(user);
         console.log('🔐 User data:', userData);
         
-        if (!userData.isAdmin) {
-          console.error('❌ User is not admin, redirecting');
-          toast.error('Admin privileges required');
-          navigate('/admin/adminLogin');
+        // Check if user is admin - check both isAdmin flag and role field
+        const isAdmin = userData.isAdmin === true || userData.role === 'admin' || userData.userType === 'admin';
+        
+        if (!isAdmin) {
+          console.error('❌ User is not admin, redirecting. User data:', userData);
+          // Only show toast if we're actually on the admin panel route
+          if (location.pathname === '/admin/adminPanel') {
+            toast.error('Admin privileges required');
+          }
+          navigate('/admin/adminLogin', { replace: true });
           return;
         }
 
@@ -2808,8 +3286,11 @@ const AdminPanel = () => {
         
       } catch (error) {
         console.error('❌ Auth check error:', error);
-        toast.error('Invalid user data');
-        navigate('/admin/adminLogin');
+        // Only show toast if we're actually on the admin panel route
+        if (location.pathname === '/admin/adminPanel') {
+          toast.error('Invalid user data');
+        }
+        navigate('/admin/adminLogin', { replace: true });
       } finally {
         setLoading(false);
         console.log('✅ Auth check complete');
@@ -2817,15 +3298,8 @@ const AdminPanel = () => {
     };
 
     checkAuth();
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [darkMode]);
 
   const renderContent = () => {
     if (loading) {
@@ -2846,6 +3320,8 @@ const AdminPanel = () => {
         return <Dashboard />;
       case "manage-users":
         return <ManageUsers />;
+      case "archive":
+        return <ArchiveUsers />;
       case "activity-log":
         return <ActivityLog />;
       case "settings":
@@ -2889,8 +3365,23 @@ const AdminPanel = () => {
                 </span>
               </div>
             </div>
-            <div className="text-sm text-gray-500">
-              {adminUser?.name || 'System Admin'}
+            <div className="flex items-center gap-4">
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={toggleDarkMode}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200 flex items-center justify-center"
+                title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                aria-label={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                {darkMode ? (
+                  <Sun className="w-5 h-5 text-yellow-500" />
+                ) : (
+                  <Moon className="w-5 h-5 text-gray-600" />
+                )}
+              </button>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {adminUser?.name || 'System Admin'}
+              </div>
             </div>
           </nav>
         </div>
