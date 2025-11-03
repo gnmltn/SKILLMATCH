@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
+import GoogleButton from '../components/GoogleButton';
 import { Eye, EyeOff, Mail, X } from 'lucide-react';
 import girl2 from '../assets/girl2.png';
 import logo from '../assets/logo.png';
@@ -17,7 +18,6 @@ const Login = () => {
   const [serverError, setServerError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const googleButtonRef = useRef(null);
 
   // Redirect logged-in users to dashboard
   useEffect(() => {
@@ -34,85 +34,6 @@ const Login = () => {
   const [isVerifyingOTP, setIsVerifyingOTP] = useState(false);
   const [tempEmail, setTempEmail] = useState('');
 
-  // Handle Google Login
-  const handleGoogleLogin = async (response) => {
-    try {
-      setIsLoading(true);
-      setServerError('');
-
-      const res = await fetch('http://localhost:5000/api/users/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential: response.credential }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        // Check if account is archived
-        if (data.isArchived) {
-          // Store archived date if available
-          if (data.archivedAt) {
-            localStorage.setItem('archivedInfo', JSON.stringify({ archivedAt: data.archivedAt }));
-          }
-          navigate('/archived-account');
-          return;
-        }
-        setServerError(data.message || 'Google login failed');
-        return;
-      }
-
-      localStorage.setItem('token', data.token);
-      // Store minimal user data to avoid localStorage quota issues
-      const minimalUserData = {
-        _id: data.user._id,
-        id: data.user.id,
-        firstName: data.user.firstName,
-        lastName: data.user.lastName,
-        email: data.user.email,
-        profilePicture: data.user.profilePicture,
-        course: data.user.course,
-        yearLevel: data.user.yearLevel,
-        userType: data.user.userType
-      };
-      
-      try {
-        localStorage.setItem('user', JSON.stringify(minimalUserData));
-      } catch (storageError) {
-        console.error('Failed to store user data:', storageError);
-        localStorage.setItem('user', JSON.stringify({ _id: data.user._id, email: data.user.email }));
-      }
-      
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Google login error:', error);
-      setServerError('An error occurred during Google login');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Initialize Google Login on component mount
-  const initializeGoogleLogin = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!window.google || !clientId) {
-      console.warn('Google OAuth not configured');
-      return;
-    }
-
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: handleGoogleLogin,
-    });
-
-    if (googleButtonRef.current) {
-      window.google.accounts.id.renderButton(googleButtonRef.current, {
-        theme: 'outline',
-        size: 'large',
-        width: '100%',
-      });
-    }
-  };
 
   // Handle Manual Login - Step 1: Send OTP
   const handleSubmit = async (e) => {
@@ -243,8 +164,12 @@ const Login = () => {
         localStorage.setItem('user', JSON.stringify({ _id: data.user._id, email: data.user.email }));
       }
       
-      // Navigate to dashboard
-      navigate('/dashboard');
+      // Navigate to saved page or dashboard
+      const savedPage = localStorage.getItem('userActivePage');
+      const destination = savedPage && savedPage !== '/login' && savedPage !== '/signup' 
+        ? savedPage 
+        : '/dashboard';
+      navigate(destination, { replace: true });
     } catch (error) {
       console.error('Verify OTP error:', error);
       setOtpError(error.message || 'An error occurred. Please try again.');
@@ -506,15 +431,8 @@ const Login = () => {
           </div>
 
           {/* Google Login Button */}
-          <div ref={googleButtonRef} className="w-full flex items-center justify-center">
-            <button
-              type="button"
-              onClick={initializeGoogleLogin}
-              className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-              Continue with Google
-            </button>
+          <div className="w-full flex items-center justify-center">
+            <GoogleButton />
           </div>
         </div>
 

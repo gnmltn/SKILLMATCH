@@ -3,6 +3,7 @@ import { adminAuth } from './adminAuth.js';
 import User from '../models/User.js';
 import ActivityLog from '../models/ActivityLog.js';
 import Admin from '../models/Admin.js';
+import Settings from '../models/Settings.js';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -66,7 +67,7 @@ router.get('/profile', adminAuth, async (req, res) => {
 
     const profileData = {
       _id: adminUser._id,
-      name: `${adminUser.firstName} ${adminUser.lastName}`,
+      name: `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim(),
       email: adminUser.email,
       profilePicture: adminUser.profilePicture || '', // Use as-is, don't modify
       isAdmin: true,
@@ -133,15 +134,42 @@ router.put('/profile', adminAuth, async (req, res) => {
     }
 
     // Update fields
+    console.log('🔍 Updating admin profile:', { name, email, hasPassword: !!newPassword });
+    console.log('🔍 Current admin data:', { 
+      modelName: admin.constructor.modelName,
+      id: admin._id,
+      currentFirstName: admin.firstName,
+      currentLastName: admin.lastName,
+      currentName: admin.name,
+      currentEmail: admin.email
+    });
+
     if (name) {
-      // Parse name into firstName and lastName
-      const nameParts = name.trim().split(' ');
-      if (nameParts.length > 0) {
-        admin.firstName = nameParts[0];
-        admin.lastName = nameParts.slice(1).join(' ') || '';
+      const trimmedName = name.trim();
+      console.log('🔍 Processing name:', trimmedName);
+      
+      // Check if this is Admin model (has name field) or User model (has firstName/lastName)
+      if (admin.constructor.modelName === 'Admin' || admin.name !== undefined) {
+        // Admin model - update name field directly
+        admin.name = trimmedName;
+        console.log('✅ Updated Admin.name to:', trimmedName);
+      } else {
+        // User model - parse name into firstName and lastName
+        const nameParts = trimmedName.split(' ');
+        if (nameParts.length > 0) {
+          admin.firstName = nameParts[0];
+          admin.lastName = nameParts.slice(1).join(' ') || '';
+          console.log('✅ Updated User.firstName to:', admin.firstName);
+          console.log('✅ Updated User.lastName to:', admin.lastName);
+        }
       }
     }
-    if (email) admin.email = email;
+    
+    if (email) {
+      admin.email = email;
+      console.log('✅ Updated email to:', email);
+    }
+    
     if (newPassword) {
       // Check for whitespace in password
       if (/\s/.test(newPassword)) {
@@ -151,23 +179,76 @@ router.put('/profile', adminAuth, async (req, res) => {
         });
       }
       admin.password = newPassword;
+      console.log('✅ Password updated');
     }
 
+    console.log('💾 Saving admin...');
     await admin.save();
+    console.log('✅ Admin saved successfully');
 
-    // Format response - use firstName and lastName for User model
+    // Refresh admin from database to ensure we have the absolute latest values
+    // This is important because mongoose might have applied middleware/validators
+    let refreshedAdmin;
+    if (admin.constructor.modelName === 'Admin') {
+      refreshedAdmin = await Admin.findById(admin._id);
+      console.log('✅ Refreshed Admin model');
+    } else {
+      refreshedAdmin = await User.findById(admin._id).select('-password');
+      console.log('✅ Refreshed User model');
+    }
+
+    if (!refreshedAdmin) {
+      console.error('❌ Admin not found after save:', admin._id);
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found after update'
+      });
+    }
+
+    console.log('🔍 Refreshed admin data:', { 
+      modelName: refreshedAdmin.constructor.modelName,
+      name: refreshedAdmin.name,
+      firstName: refreshedAdmin.firstName,
+      lastName: refreshedAdmin.lastName,
+      email: refreshedAdmin.email
+    });
+    
+    // Construct name based on model type
+    let constructedName;
+    if (refreshedAdmin.constructor.modelName === 'Admin' || refreshedAdmin.name !== undefined) {
+      // Admin model - use name field
+      constructedName = refreshedAdmin.name || '';
+      console.log('✅ Using Admin.name:', constructedName);
+    } else {
+      // User model - construct from firstName/lastName
+      constructedName = `${refreshedAdmin.firstName || ''} ${refreshedAdmin.lastName || ''}`.trim();
+      console.log('✅ Constructed name from firstName/lastName:', constructedName);
+      console.log('✅ firstName:', refreshedAdmin.firstName);
+      console.log('✅ lastName:', refreshedAdmin.lastName);
+    }
+    
     const userResponse = {
-      _id: admin._id,
-      name: admin.name || `${admin.firstName || ''} ${admin.lastName || ''}`.trim(),
-      email: admin.email,
-      profilePicture: admin.profilePicture || '',
-      isAdmin: true
+      _id: refreshedAdmin._id,
+      name: constructedName,
+      email: refreshedAdmin.email,
+      profilePicture: refreshedAdmin.profilePicture || '',
+      isAdmin: true,
+      role: refreshedAdmin.role || 'admin'
     };
 
-    // Log the activity
-    await req.user.logActivity('updated admin profile', 'user_management', {
-      fieldsUpdated: Object.keys(req.body).filter(key => key !== 'currentPassword')
-    });
+    console.log('✅ Final profile update response:', JSON.stringify(userResponse, null, 2));
+
+    // Log the activity - use req.user which is already set by middleware
+    try {
+      if (req.user && typeof req.user.logActivity === 'function') {
+        await req.user.logActivity('updated admin profile', 'user_management', {
+          fieldsUpdated: Object.keys(req.body).filter(key => key !== 'currentPassword')
+        });
+      }
+    } catch (logError) {
+      console.error('Error logging activity:', logError);
+      // Don't fail the request if logging fails
+    }
 
     res.json({
       success: true,
@@ -314,23 +395,52 @@ router.delete('/profile/picture', adminAuth, async (req, res) => {
   }
 });
 
+// GET SYSTEM SETTINGS (public endpoint for checking maintenance mode and registration status)
+router.get('/settings/system/public', async (req, res) => {
+  try {
+    const settings = await Settings.getSettings();
+    
+    const publicSettings = {
+      allowRegistrations: settings.allowRegistrations,
+      emailVerification: settings.emailVerification,
+      maintenanceMode: settings.maintenanceMode,
+      maintenanceMessage: settings.maintenanceMessage
+    };
+
+    res.json({
+      success: true,
+      data: publicSettings
+    });
+
+  } catch (error) {
+    console.error('❌ Get public system settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching system settings',
+      error: error.message
+    });
+  }
+});
+
 // GET SYSTEM SETTINGS
 router.get('/settings/system', adminAuth, async (req, res) => {
   try {
     console.log('🔍 Fetching system settings');
     
-    // In a real app, you'd fetch from a Settings model
+    const settings = await Settings.getSettings();
+    
     const systemSettings = {
-      allowRegistrations: true,
-      emailVerification: true,
-      maintenanceMode: false,
-      sessionTimeout: 30,
-      maxLoginAttempts: 5,
-      siteName: 'SkillMatch',
-      siteDescription: 'Skill Development Platform',
-      contactEmail: 'admin@skillmatch.com',
-      maxFileSize: 5,
-      allowedFileTypes: ['image/jpeg', 'image/png', 'image/gif']
+      allowRegistrations: settings.allowRegistrations,
+      emailVerification: settings.emailVerification,
+      maintenanceMode: settings.maintenanceMode,
+      maintenanceMessage: settings.maintenanceMessage,
+      sessionTimeout: settings.sessionTimeout,
+      maxLoginAttempts: settings.maxLoginAttempts,
+      siteName: settings.siteName,
+      siteDescription: settings.siteDescription,
+      contactEmail: settings.contactEmail,
+      maxFileSize: settings.maxFileSize,
+      allowedFileTypes: settings.allowedFileTypes
     };
 
     res.json({
@@ -353,22 +463,44 @@ router.put('/settings/system', adminAuth, async (req, res) => {
   try {
     console.log('🔍 Updating system settings:', req.body);
     
-    const {
-      allowRegistrations,
-      emailVerification,
-      maintenanceMode,
-      sessionTimeout,
-      maxLoginAttempts
-    } = req.body;
+    const settings = await Settings.getSettings();
+    
+    // Update settings from request body
+    if (req.body.allowRegistrations !== undefined) {
+      settings.allowRegistrations = req.body.allowRegistrations;
+    }
+    if (req.body.emailVerification !== undefined) {
+      settings.emailVerification = req.body.emailVerification;
+    }
+    if (req.body.maintenanceMode !== undefined) {
+      settings.maintenanceMode = req.body.maintenanceMode;
+    }
+    if (req.body.maintenanceMessage !== undefined) {
+      settings.maintenanceMessage = req.body.maintenanceMessage;
+    }
+    if (req.body.sessionTimeout !== undefined) {
+      settings.sessionTimeout = req.body.sessionTimeout;
+    }
+    if (req.body.maxLoginAttempts !== undefined) {
+      settings.maxLoginAttempts = req.body.maxLoginAttempts;
+    }
+    if (req.body.siteName !== undefined) {
+      settings.siteName = req.body.siteName;
+    }
+    if (req.body.siteDescription !== undefined) {
+      settings.siteDescription = req.body.siteDescription;
+    }
+    if (req.body.contactEmail !== undefined) {
+      settings.contactEmail = req.body.contactEmail;
+    }
+    if (req.body.maxFileSize !== undefined) {
+      settings.maxFileSize = req.body.maxFileSize;
+    }
+    if (req.body.allowedFileTypes !== undefined) {
+      settings.allowedFileTypes = req.body.allowedFileTypes;
+    }
 
-    // In a real app, you'd save to a Settings model
-    const updatedSettings = {
-      allowRegistrations: allowRegistrations !== undefined ? allowRegistrations : true,
-      emailVerification: emailVerification !== undefined ? emailVerification : true,
-      maintenanceMode: maintenanceMode !== undefined ? maintenanceMode : false,
-      sessionTimeout: sessionTimeout || 30,
-      maxLoginAttempts: maxLoginAttempts || 5
-    };
+    await settings.save();
 
     // Log the activity
     await ActivityLog.create({
@@ -377,8 +509,22 @@ router.put('/settings/system', adminAuth, async (req, res) => {
       type: 'system',
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),
-      metadata: { settings: updatedSettings }
+      metadata: { settings: req.body }
     });
+
+    const updatedSettings = {
+      allowRegistrations: settings.allowRegistrations,
+      emailVerification: settings.emailVerification,
+      maintenanceMode: settings.maintenanceMode,
+      maintenanceMessage: settings.maintenanceMessage,
+      sessionTimeout: settings.sessionTimeout,
+      maxLoginAttempts: settings.maxLoginAttempts,
+      siteName: settings.siteName,
+      siteDescription: settings.siteDescription,
+      contactEmail: settings.contactEmail,
+      maxFileSize: settings.maxFileSize,
+      allowedFileTypes: settings.allowedFileTypes
+    };
 
     res.json({
       success: true,
@@ -423,13 +569,13 @@ router.get('/dashboard/stats', adminAuth, async (req, res) => {
       userType: 'student'
     });
 
-    // Get daily activity (users active today)
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    // Get online users NOW (users who are currently online with recent activity)
+    const tenSecondsAgo = new Date(Date.now() - 10 * 1000); // 10 seconds ago
     
-    const dailyActivity = await User.countDocuments({
-      updatedAt: { $gte: startOfToday },
-      userType: 'student'
+    const onlineNow = await User.countDocuments({
+      userType: 'student',
+      isOnline: true,
+      lastActivity: { $gte: tenSecondsAgo }
     });
 
     // ========== REAL USER GROWTH DATA (Last 6 months) ==========
@@ -510,7 +656,7 @@ router.get('/dashboard/stats', adminAuth, async (req, res) => {
       stats: {
         activeStudents,
         newSignups,
-        dailyActivity,
+        dailyActivity: onlineNow, // Use onlineNow instead of dailyActivity for "Online Now" card
         totalUsers
       },
       charts: {
@@ -529,7 +675,7 @@ router.get('/dashboard/stats', adminAuth, async (req, res) => {
       totalUsers,
       activeStudents,
       newSignups,
-      dailyActivity,
+      onlineNow,
       userGrowth: userGrowthData,
       weeklyActivity: weeklyActivityData
     });
@@ -673,7 +819,7 @@ router.get('/users', adminAuth, async (req, res) => {
       email: user.email,
       joinDate: user.createdAt.toLocaleDateString(),
       lastLogin: getTimeAgo(user.lastActivity || user.updatedAt),
-      status: user.isArchived ? 'Suspended' : getStatusFromLastActivity(user.lastActivity),
+      status: user.isArchived ? 'Suspended' : getStatusFromLastActivity(user.lastActivity, user.isOnline),
       type: user.userType || 'student'
     }));
 
@@ -753,7 +899,7 @@ router.put('/users/:id', adminAuth, async (req, res) => {
           id: user._id,
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
-          status: getStatusFromLastActivity(user.lastActivity),
+          status: getStatusFromLastActivity(user.lastActivity, user.isOnline),
           type: user.userType
         }
       }
@@ -881,7 +1027,7 @@ router.get('/users/archived', adminAuth, async (req, res) => {
       joinDate: user.createdAt.toLocaleDateString(),
       archivedAt: user.archivedAt ? user.archivedAt.toLocaleDateString() : 'N/A',
       lastLogin: getTimeAgo(user.lastActivity || user.updatedAt),
-      status: getStatusFromLastActivity(user.lastActivity),
+      status: getStatusFromLastActivity(user.lastActivity, user.isOnline),
       type: user.userType || 'student'
     }));
 
@@ -1085,18 +1231,35 @@ router.get('/activity-logs', adminAuth, async (req, res) => {
 
     // User filter (if provided)
     if (user) {
-      const userSearchFilter = {
-        $and: [
-          { $regex: user, $options: 'i' },
-          { $not: { $regex: 'admin|system|administrator', $options: 'i' } }
-        ]
-      };
-
-      // If we have $and already (from skill filter), add user filter to it
+      // Combine user search regex with admin exclusion
+      const userSearchRegex = { user: { $regex: user, $options: 'i' } };
+      
+      // If we have $and already (from skill filter), add user search condition
       if (filter.$and) {
-        filter.$and.push({ user: userSearchFilter });
+        // Check if baseUserFilter already exists in $and (from skill filter)
+        const hasBaseUserFilter = filter.$and.some(
+          condition => condition.user && JSON.stringify(condition.user) === JSON.stringify(baseUserFilter)
+        );
+        
+        // Add user search regex condition
+        filter.$and.push(userSearchRegex);
+        
+        // Only add baseUserFilter if it's not already there
+        if (!hasBaseUserFilter) {
+          filter.$and.push({ user: baseUserFilter });
+        }
+        
+        // Remove standalone user filter if it exists
+        if (filter.user) {
+          delete filter.user;
+        }
       } else {
-        filter.user = userSearchFilter;
+        // If no existing $and, replace the base user filter with combined conditions
+        delete filter.user;
+        filter.$and = [
+          userSearchRegex,
+          { user: baseUserFilter }
+        ];
       }
     }
 
@@ -1349,7 +1512,12 @@ function getSkillCategory(skillName) {
 }
 
 // ========== HELPER FUNCTIONS ==========
-function getStatusFromLastActivity(lastActivity) {
+function getStatusFromLastActivity(lastActivity, isOnline) {
+  // If user is explicitly marked as offline, return Inactive
+  if (isOnline === false) {
+    return 'Inactive';
+  }
+  
   if (!lastActivity) {
     return 'Inactive';
   }
@@ -1357,7 +1525,12 @@ function getStatusFromLastActivity(lastActivity) {
   const now = new Date();
   const tenSecondsAgo = new Date(now.getTime() - 10 * 1000); // 10 seconds ago
   
-  return lastActivity >= tenSecondsAgo ? 'Active' : 'Inactive';
+  // User must be online AND have recent activity to be Active
+  if (isOnline === true && lastActivity >= tenSecondsAgo) {
+    return 'Active';
+  }
+  
+  return 'Inactive';
 }
 
 function getTimeAgo(date) {
@@ -1365,10 +1538,24 @@ function getTimeAgo(date) {
   const diffInSeconds = Math.floor((now - new Date(date)) / 1000);
   
   if (diffInSeconds < 60) return 'Just now';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
-  return `${Math.floor(diffInSeconds / 2592000)} months ago`;
+  
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInSeconds < 3600) {
+    return `${diffInMinutes} ${diffInMinutes === 1 ? 'min' : 'min'} ago`;
+  }
+  
+  const diffInHours = Math.floor(diffInSeconds / 3600);
+  if (diffInSeconds < 86400) {
+    return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
+  }
+  
+  const diffInDays = Math.floor(diffInSeconds / 86400);
+  if (diffInSeconds < 2592000) {
+    return `${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`;
+  }
+  
+  const diffInMonths = Math.floor(diffInSeconds / 2592000);
+  return `${diffInMonths} ${diffInMonths === 1 ? 'month' : 'months'} ago`;
 }
 
 export default router;

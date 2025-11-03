@@ -27,6 +27,8 @@ const Signup = () => {
   const [otpError, setOtpError] = useState('');
   const [isVerifyingOTP, setIsVerifyingOTP] = useState(false);
   const [tempEmail, setTempEmail] = useState('');
+  const [is404Page, setIs404Page] = useState(false);
+  const [emailVerificationEnabled, setEmailVerificationEnabled] = useState(true);
 
   // Redirect logged-in users to dashboard
   useEffect(() => {
@@ -35,6 +37,28 @@ const Signup = () => {
       navigate('/dashboard', { replace: true });
     }
   }, [navigate]);
+
+  // Check if registration is disabled and email verification status
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/admin/settings/system/public');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            if (!data.data.allowRegistrations) {
+              setIs404Page(true);
+            }
+            setEmailVerificationEnabled(data.data.emailVerification !== false);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check registration status:', error);
+      }
+    };
+
+    checkRegistrationStatus();
+  }, []);
 
   const validateFirstName = (value) => /^[a-zA-Z\s]*$/.test(value);
   const validateLastName = (value) => /^[a-zA-Z\s]*$/.test(value);
@@ -48,9 +72,11 @@ const Signup = () => {
       return false;
     }
     const hasMinLength = value.length >= 8;
+    const hasUppercase = /[A-Z]/.test(value);
+    const hasLowercase = /[a-z]/.test(value);
     const hasNumber = /\d/.test(value);
     const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value);
-    return hasMinLength && hasNumber && hasSpecialChar;
+    return hasMinLength && hasUppercase && hasLowercase && hasNumber && hasSpecialChar;
   };
 
   const handleInputChange = (e) => {
@@ -86,7 +112,7 @@ const Signup = () => {
     else if (!validateEmail(formData.email)) newErrors.email = 'Please enter a valid Gmail address';
 
     if (!formData.password) newErrors.password = 'Password is required';
-    else if (!validatePassword(formData.password)) newErrors.password = 'Password must be minimum 8 characters with at least 1 number and 1 special character';
+    else if (!validatePassword(formData.password)) newErrors.password = 'Password must be minimum 8 characters with at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character';
     else if (/\s/.test(formData.password)) newErrors.password = 'Password cannot contain whitespace';
 
     if (!formData.confirmPassword) newErrors.confirmPassword = 'Confirm password is required';
@@ -100,7 +126,67 @@ const Signup = () => {
       return;
     }
 
-    // Send OTP to email
+    // If email verification is disabled, directly create the account without OTP
+    if (!emailVerificationEnabled) {
+      try {
+        setIsLoading(true);
+        setServerError('');
+
+        const response = await fetch('http://localhost:5000/api/users/signup/verify-otp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...formData,
+            otp: '' // Empty OTP when email verification is disabled
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (response.status === 404 && data.registrationDisabled) {
+            setIs404Page(true);
+            return;
+          }
+          setServerError(data.message || 'Failed to create account. Please try again.');
+          return;
+        }
+
+        // Store token and minimal user data
+        localStorage.setItem('token', data.token);
+        const minimalUserData = {
+          _id: data.user._id,
+          id: data.user.id,
+          firstName: data.user.firstName,
+          lastName: data.user.lastName,
+          email: data.user.email,
+          profilePicture: data.user.profilePicture,
+          course: data.user.course,
+          yearLevel: data.user.yearLevel,
+          userType: data.user.userType
+        };
+        
+        try {
+          localStorage.setItem('user', JSON.stringify(minimalUserData));
+        } catch (storageError) {
+          console.error('Failed to store user data:', storageError);
+          localStorage.setItem('user', JSON.stringify({ _id: data.user._id, email: data.user.email }));
+        }
+
+        navigate('/login');
+        return;
+      } catch (error) {
+        console.error('Create account error:', error);
+        setServerError('An error occurred. Please try again.');
+        return;
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    // Send OTP to email (only if email verification is enabled)
     try {
       setIsLoading(true);
       setServerError('');
@@ -116,6 +202,11 @@ const Signup = () => {
       const data = await response.json();
 
       if (!response.ok) {
+        // Check if registration is disabled (404 error)
+        if (response.status === 404 && data.registrationDisabled) {
+          setIs404Page(true);
+          return;
+        }
         setServerError(data.message || 'Failed to send OTP. Please try again.');
         return;
       }
@@ -156,6 +247,11 @@ const Signup = () => {
       const data = await response.json();
 
       if (!response.ok) {
+        // Check if registration is disabled (404 error)
+        if (response.status === 404 && data.registrationDisabled) {
+          setIs404Page(true);
+          return;
+        }
         setOtpError(data.message || 'Invalid OTP. Please try again.');
         return;
       }
@@ -394,6 +490,36 @@ const Signup = () => {
       </div>
     </div>
   );
+
+  // Show 404 page if registration is disabled
+  if (is404Page) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center">
+          <div className="flex justify-center mb-6">
+            <div className="bg-red-100 dark:bg-red-900/20 rounded-full p-4">
+              <X className="text-red-600 dark:text-red-400" size={48} />
+            </div>
+          </div>
+          
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+            404 - Page Not Found
+          </h1>
+          
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            Registration is currently disabled. Please contact the administrator for more information.
+          </p>
+          
+          <Link 
+            to="/" 
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            Go Back Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">

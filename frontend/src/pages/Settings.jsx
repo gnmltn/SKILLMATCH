@@ -1,6 +1,6 @@
 import DashboardNav from '../components/dashboardNav';
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Trash2, Moon, Sun, Palette } from 'lucide-react';
+import { Eye, EyeOff, Moon, Sun, Palette } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -237,12 +237,6 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
     }
   };
 
-  const handleDeleteAccount = () => {
-    toast.error('Account deletion requires confirmation', {
-      description: 'Please contact support to proceed with account deletion.'
-    });
-  };
-
   return (
     <div className="space-y-6 w-full">
       <div className="w-full">
@@ -353,18 +347,6 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
             {isLoading ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
-      </div>
-
-      <div className="border border-destructive/20 rounded-xl p-6 bg-destructive/5 w-full">
-        <h3 className="text-lg font-semibold text-destructive mb-2">Danger Zone</h3>
-        <p className="text-sm text-destructive/80 mb-4">Irreversible account actions</p>
-        <button 
-          onClick={handleDeleteAccount}
-          className="flex items-center gap-2 bg-destructive text-destructive-foreground py-2.5 px-4 rounded-lg hover:bg-destructive/90 hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm font-medium"
-        >
-          <Trash2 size={16} />
-          Delete Account
-        </button>
       </div>
     </div>
   );

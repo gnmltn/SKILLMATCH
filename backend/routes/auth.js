@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { OAuth2Client } from 'google-auth-library';
 import PasswordReset from '../models/PasswordReset.js';
+import Settings from '../models/Settings.js';
 import { sendOTPEmail, verifyGmailExists } from '../utils/emailService.js';
 
 const router = express.Router();
@@ -39,6 +40,16 @@ const generateUniqueID = async () => {
 
 router.post("/signup/send-otp", async (req, res) => {
   try {
+    // Check if registrations are allowed
+    const settings = await Settings.getSettings();
+    if (!settings.allowRegistrations) {
+      return res.status(404).json({
+        success: false,
+        message: 'Registration is currently disabled',
+        registrationDisabled: true
+      });
+    }
+
     const { firstName, lastName, email, password, confirmPassword } = req.body;
 
     if (!firstName || !lastName || !email || !password || !confirmPassword) {
@@ -72,12 +83,14 @@ router.post("/signup/send-otp", async (req, res) => {
     }
 
     
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
     const hasNumber = /\d/.test(password);
     const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
-    if (!hasNumber || !hasSpecialChar) {
+    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecialChar) {
       return res.status(400).json({ 
         success: false,
-        message: "Password must contain at least 1 number and 1 special character" 
+        message: "Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character" 
       });
     }
 
@@ -112,8 +125,13 @@ router.post("/signup/send-otp", async (req, res) => {
       userAgent: req.get('User-Agent') || 'Unknown'
     });
 
-    console.log("Attempting to send email to:", cleanEmail);
-    await sendOTPEmail(cleanEmail, otpCode, 'signup');
+    // Only send email if email verification is enabled
+    if (settings.emailVerification) {
+      console.log("Attempting to send email to:", cleanEmail);
+      await sendOTPEmail(cleanEmail, otpCode, 'signup');
+    } else {
+      console.log("Email verification is disabled. Skipping email send.");
+    }
 
     console.log('Signup OTP sent to:', cleanEmail);
 
@@ -140,6 +158,16 @@ router.post("/signup/send-otp", async (req, res) => {
 
 router.post("/signup/verify-otp", async (req, res) => {
   try {
+    // Check if registrations are allowed
+    const settings = await Settings.getSettings();
+    if (!settings.allowRegistrations) {
+      return res.status(404).json({
+        success: false,
+        message: 'Registration is currently disabled',
+        registrationDisabled: true
+      });
+    }
+
     const { firstName, lastName, email, password, otp } = req.body;
 
     if (!firstName || !lastName || !email || !password || !otp) {
@@ -176,18 +204,29 @@ router.post("/signup/verify-otp", async (req, res) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    const otpRecord = await PasswordReset.findOne({ 
-      email: cleanEmail, 
-      otpCode: otp,
-      isUsed: false,
-      otpExpiresAt: { $gt: new Date() }
-    });
+    // If email verification is enabled, verify OTP; otherwise skip verification
+    let otpRecord = null;
+    if (settings.emailVerification) {
+      if (!otp) {
+        return res.status(400).json({ 
+          success: false,
+          message: "OTP is required when email verification is enabled." 
+        });
+      }
 
-    if (!otpRecord) {
-      return res.status(400).json({ 
-        success: false,
-        message: "OTP expired or not found. Please request a new one." 
+      otpRecord = await PasswordReset.findOne({ 
+        email: cleanEmail, 
+        otpCode: otp,
+        isUsed: false,
+        otpExpiresAt: { $gt: new Date() }
       });
+
+      if (!otpRecord) {
+        return res.status(400).json({ 
+          success: false,
+          message: "OTP expired or not found. Please request a new one." 
+        });
+      }
     }
 
     const uniqueID = await generateUniqueID();
@@ -204,8 +243,11 @@ router.post("/signup/verify-otp", async (req, res) => {
 
     const user = await User.create(userData);
 
-    otpRecord.isUsed = true;
-    await otpRecord.save();
+    // Mark OTP as used only if email verification is enabled
+    if (settings.emailVerification && otpRecord) {
+      otpRecord.isUsed = true;
+      await otpRecord.save();
+    }
 
     const token = generateToken(user._id);
 
@@ -428,6 +470,16 @@ router.post("/login/verify-otp", async (req, res) => {
 
 router.post("/signup", async (req, res) => {
   try {
+    // Check if registrations are allowed
+    const settings = await Settings.getSettings();
+    if (!settings.allowRegistrations) {
+      return res.status(404).json({
+        success: false,
+        message: 'Registration is currently disabled',
+        registrationDisabled: true
+      });
+    }
+
     const { firstName, lastName, email, password, confirmPassword } = req.body;
 
     if (!firstName || !lastName || !email || !password || !confirmPassword) {
@@ -459,12 +511,14 @@ router.post("/signup", async (req, res) => {
       });
     }
 
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
     const hasNumber = /\d/.test(password);
     const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
-    if (!hasNumber || !hasSpecialChar) {
+    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecialChar) {
       return res.status(400).json({ 
         success: false,
-        message: "Password must contain at least 1 number and 1 special character" 
+        message: "Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character" 
       });
     }
 
@@ -784,6 +838,126 @@ router.post("/google", async (req, res) => {
   }
 });
 
+// Google OAuth login endpoint (used by @react-oauth/google)
+router.post("/auth/google/login", async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({ 
+        message: "Missing credential" 
+      });
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+    
+    if (!payload?.email || !payload?.email_verified) {
+      return res.status(401).json({ 
+        message: "Google account not verified." 
+      });
+    }
+
+    const email = payload.email.toLowerCase();
+    const firstName = payload.given_name || payload.name?.split(" ")[0] || "User";
+    const lastName = payload.family_name || payload.name?.split(" ")[1] || "";
+
+    // Check if email is Gmail
+    const gmailRegex = /^[^\s@]+@gmail\.com$/i;
+    if (!gmailRegex.test(email)) {
+      return res.status(400).json({ 
+        message: "Please use a Gmail account" 
+      });
+    }
+
+    // Find user (don't create new users automatically for login)
+    let user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ 
+        message: "No account with this Google email. Please register first." 
+      });
+    }
+
+    // Check if user is archived
+    if (user.isArchived) {
+      return res.status(403).json({
+        message: "Your account has been archived by an administrator",
+        isArchived: true,
+        archivedAt: user.archivedAt || null
+      });
+    }
+
+    // Update user info if missing
+    if (!user.profilePicture && payload.picture) {
+      user.profilePicture = payload.picture;
+    }
+    if (!user.firstName && firstName) {
+      user.firstName = firstName.trim();
+    }
+    if (!user.lastName && lastName) {
+      user.lastName = lastName.trim();
+    }
+    await user.save({ validateBeforeSave: false });
+
+    // Generate token for Google user
+    const token = generateToken(user._id);
+
+    // Set user as online and update lastActivity
+    user.isOnline = true;
+    user.lastActivity = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    // Log user login activity for Google login
+    try {
+      await user.logActivity(
+        `Logged in successfully via Google`,
+        'login',
+        {
+          ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'N/A',
+          userAgent: req.get('User-Agent') || 'N/A',
+          loginMethod: 'Google OAuth'
+        }
+      );
+    } catch (activityError) {
+      console.error('Failed to log Google login activity:', activityError);
+      // Don't fail the login if activity logging fails
+    }
+
+    return res.json({
+      token,
+      user: {
+        id: user._id.toString(),
+        _id: user._id.toString(),
+        username: user.firstName + " " + user.lastName || user.email.split("@")[0],
+        name: `${user.firstName} ${user.lastName}`.trim() || user.email.split("@")[0],
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        avatar: user.profilePicture,
+        profilePicture: user.profilePicture,
+        role: user.role || user.userType || "student",
+        userType: user.userType || "student",
+        isVerified: true,
+        course: user.course,
+        yearLevel: user.yearLevel,
+        skills: user.skills || [],
+        projectHistory: user.projectHistory || []
+      },
+      needsPassword: !user.password || user.password.length < 20 // Simple check if password was auto-generated
+    });
+
+  } catch (error) {
+    console.error('Google login error:', error);
+    return res.status(401).json({ 
+      message: "Google sign-in failed." 
+    });
+  }
+});
+
 router.get("/debug-db", async (req, res) => {
   try {
     const users = await User.find({});
@@ -1099,6 +1273,55 @@ router.post("/heartbeat", async (req, res) => {
       success: false,
       message: "Server error during heartbeat",
       error: error.message
+    });
+  }
+});
+
+// Mark user as offline endpoint
+router.post("/offline", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required"
+      });
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+      const user = await User.findById(decoded.id);
+      
+      if (user) {
+        // Mark user as offline but keep lastActivity timestamp
+        user.isOnline = false;
+        await user.save({ validateBeforeSave: false });
+        
+        return res.status(200).json({
+          success: true,
+          message: "User marked as offline"
+        });
+      }
+    } catch (tokenError) {
+      // Even if token is invalid, return success to avoid errors on page close
+      return res.status(200).json({
+        success: true,
+        message: "Offline status updated"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Offline status updated"
+    });
+
+  } catch (error) {
+    console.error("OFFLINE ERROR:", error);
+    // Return success even on error to avoid issues when page is closing
+    return res.status(200).json({
+      success: true,
+      message: "Offline status updated"
     });
   }
 });

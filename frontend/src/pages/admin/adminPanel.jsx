@@ -56,7 +56,9 @@ import {
   Filter,
   Info,
   Archive,
-  RotateCcw
+  RotateCcw,
+  Menu,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -70,8 +72,14 @@ const getAuthHeaders = () => {
   // Use adminToken for admin panel to avoid conflicts with student sessions
   const token = localStorage.getItem('adminToken');
   if (!token) {
-    console.error('❌ No authentication token found');
-    throw new Error('No authentication token found');
+    console.error('❌ No authentication token found - redirecting to login');
+    // Clear any existing admin data
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('isAdmin');
+    // Redirect to login page
+    window.location.href = '/admin/adminLogin';
+    throw new Error('No authentication token found. Please login again.');
   }
   return {
     'Authorization': `Bearer ${token}`,
@@ -87,8 +95,14 @@ const apiCall = async (url, options = {}) => {
     // Use adminToken for admin panel API calls to avoid conflicts with student sessions
     const token = localStorage.getItem('adminToken');
     if (!token) {
-      console.error('❌ No authentication token found');
-      throw new Error('No authentication token found');
+      console.error('❌ No authentication token found - redirecting to login');
+      // Clear any existing admin data
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUser');
+      localStorage.removeItem('isAdmin');
+      // Redirect to login page
+      window.location.href = '/admin/adminLogin';
+      throw new Error('No authentication token found. Please login again.');
     }
 
     // For FormData, don't set Content-Type header - let the browser set it
@@ -340,9 +354,19 @@ function getTimeAgo(date) {
   const diffInSeconds = Math.floor((now - new Date(date)) / 1000);
   
   if (diffInSeconds < 60) return 'Just now';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-  return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInSeconds < 3600) {
+    return `${diffInMinutes} ${diffInMinutes === 1 ? 'min' : 'min'} ago`;
+  }
+  
+  const diffInHours = Math.floor(diffInSeconds / 3600);
+  if (diffInSeconds < 86400) {
+    return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
+  }
+  
+  const diffInDays = Math.floor(diffInSeconds / 86400);
+  return `${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`;
 }
 
 // ========== SIDEBAR COMPONENT ==========
@@ -380,7 +404,7 @@ const Sidebar = ({ activePage, setActivePage, adminUser }) => {
   return (
     <div className="flex flex-col h-full">
       {/* User Info Section */}
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+      <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
         <div className="flex items-center gap-3">
           {adminUser?.profilePicture ? (
             <img
@@ -415,7 +439,7 @@ const Sidebar = ({ activePage, setActivePage, adminUser }) => {
       <div className="flex-1 flex flex-col justify-between">
         <div className="py-4">
           <nav>
-            <ul className="space-y-2 px-4">
+            <ul className="space-y-2 px-2 sm:px-4">
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activePage === item.id;
@@ -444,7 +468,7 @@ const Sidebar = ({ activePage, setActivePage, adminUser }) => {
         </div>
 
         {/* Logout Button*/}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+        <div className="p-2 sm:p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors duration-200"
@@ -735,81 +759,81 @@ useEffect(() => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Dashboard</h1>
-        <div className="text-sm text-gray-500">Last updated: {new Date().toLocaleTimeString()}</div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Dashboard</h1>
+        <div className="text-xs sm:text-sm text-gray-500">Last updated: {new Date().toLocaleTimeString()}</div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Students</p>
-              <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">{stats.totalUsers.toLocaleString()}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mt-2">{stats.totalUsers.toLocaleString()}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">All registered users</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
-              <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Students</p>
-              <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">{stats.activeStudents.toLocaleString()}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mt-2">{stats.activeStudents.toLocaleString()}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Logged in last 7 days</p>
             </div>
-            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-              <Users className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">New Signups</p>
-              <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">{stats.newSignups.toLocaleString()}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mt-2">{stats.newSignups.toLocaleString()}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This month</p>
             </div>
-            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-              <Users className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Online Now</p>
-              <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">{stats.dailyActivity.toLocaleString()}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mt-2">{stats.dailyActivity.toLocaleString()}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Currently active</p>
             </div>
-            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
-              <Activity className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
+              <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* User Growth Chart */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">User Growth</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Monthly signups over time</p>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">User Growth</h2>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Monthly signups over time</p>
             </div>
-            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-green-600 dark:text-green-400">
               <TrendingUp className="w-4 h-4" />
               <span>+12% this month</span>
             </div>
           </div>
-          <div className="h-64">
+          <div className="h-48 sm:h-64">
             <Line 
               data={userGrowthData}
               options={chartOptions}
@@ -818,18 +842,18 @@ useEffect(() => {
         </div>
 
         {/* Skill Statistics Chart */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Popular Skills</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Most common skills among users</p>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white">Popular Skills</h2>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Most common skills among users</p>
             </div>
-            <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-blue-600 dark:text-blue-400">
               <Activity className="w-4 h-4" />
               <span>Top {skillStatsData.labels.length} skills</span>
             </div>
           </div>
-          <div className="h-64">
+          <div className="h-48 sm:h-64">
             <Bar 
               data={skillStatsData}
               options={skillChartOptions}
@@ -841,7 +865,7 @@ useEffect(() => {
       {/* Recent Data */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Users */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Recent Users</h2>
           <div className="space-y-3">
             {recentUsers.length > 0 ? recentUsers.map((user, index) => (
@@ -864,7 +888,7 @@ useEffect(() => {
         </div>
 
         {/* Recent Activity */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Recent User Activity</h2>
           <div className="space-y-3">
             {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
@@ -1141,10 +1165,43 @@ const ManageUsers = () => {
     limit: 10
   });
   const [loading, setLoading] = useState(false);
+  
+  // Auto-refresh state - load from localStorage or default to false
+  const [autoRefresh, setAutoRefresh] = useState(() => {
+    const saved = localStorage.getItem('adminAutoRefresh');
+    return saved === 'true';
+  });
 
   useEffect(() => {
     loadUsers();
   }, [filters]);
+
+  // Auto-refresh effect
+  useEffect(() => {
+    let intervalId = null;
+    
+    if (autoRefresh) {
+      // Refresh every 5 seconds when auto-refresh is enabled
+      intervalId = setInterval(() => {
+        console.log('🔄 Auto-refreshing users...');
+        loadUsers();
+      }, 5000);
+    }
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh, filters]);
+
+  const toggleAutoRefresh = () => {
+    const newValue = !autoRefresh;
+    setAutoRefresh(newValue);
+    localStorage.setItem('adminAutoRefresh', newValue.toString());
+    toast.success(newValue ? 'Auto-refresh enabled' : 'Auto-refresh disabled');
+  };
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -1261,13 +1318,13 @@ const ManageUsers = () => {
   const displayUsers = users;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Manage Users</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">View and manage system users</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">Manage Users</h1>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">View and manage system users</p>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">System Users</h2>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
@@ -1289,7 +1346,7 @@ const ManageUsers = () => {
               />
             </div>
             
-            <div className="flex gap-4">
+            <div className="flex gap-4 items-center">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-gray-400" />
               </div>
@@ -1304,25 +1361,47 @@ const ManageUsers = () => {
                 <option value="Inactive">Inactive</option>
                 <option value="Suspended">Suspended</option>
               </select>
+
+              {/* Auto-refresh Toggle */}
+              <div className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
+                <Zap className={`w-4 h-4 ${autoRefresh ? 'text-yellow-500' : 'text-gray-400'}`} />
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Auto-refresh</span>
+                  <button
+                    type="button"
+                    onClick={toggleAutoRefresh}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      autoRefresh ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        autoRefresh ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Users Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Join Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Login</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="inline-block min-w-full align-middle">
+            <table className="w-full min-w-[640px]">
+              <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <tr>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Email</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">Join Date</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">Last Login</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
@@ -1337,33 +1416,34 @@ const ManageUsers = () => {
                 const RoleIcon = getRoleIcon(user.type);
                 return (
                   <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${getRoleColor(user.type)}`}>
                           <RoleIcon className="w-4 h-4" />
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user.type}</div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.name}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 capitalize sm:hidden">{user.email}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 capitalize hidden sm:block">{user.type}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap hidden sm:table-cell">
                       <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-white">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        {user.email}
+                        <Mail className="w-4 h-4 text-gray-400 hidden sm:inline" />
+                        <span className="truncate max-w-[200px]">{user.email}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap hidden md:table-cell">
                       <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                         <Calendar className="w-4 h-4" />
                         {user.joinDate}
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 hidden lg:table-cell">
                       {user.lastLogin}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         user.status === 'Active' 
                           ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
@@ -1374,11 +1454,12 @@ const ManageUsers = () => {
                         {user.status}
                       </span>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => handleEdit(user)}
                           className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition"
+                          title="Edit user"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
@@ -1409,10 +1490,11 @@ const ManageUsers = () => {
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Table Footer */}
-        <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 gap-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Showing {displayUsers.length} of {pagination.totalUsers} users
           </p>
@@ -1578,7 +1660,7 @@ const ArchiveUsers = () => {
         <p className="text-gray-600 dark:text-gray-400 mt-1">Manage archived user accounts</p>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">Archived Users</h2>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
@@ -1929,7 +2011,7 @@ const ActivityLog = () => {
       </div>
 
       {/* Filters Card */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -2149,7 +2231,7 @@ function SettingsTab({ children, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`transition-all duration-200 flex items-center justify-center text-xs font-medium px-1 py-2 rounded-full w-full hover:scale-105 ${
+      className={`transition-all duration-200 flex items-center justify-center text-sm font-medium px-4 py-2.5 rounded-full w-full hover:scale-105 ${
         active 
           ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md' 
           : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700/50'
@@ -2631,24 +2713,50 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
 
       // REAL API CALL
       const response = await updateAdminProfile(updateData);
+      
+      console.log('✅ Profile update response:', response);
+      console.log('✅ Response name:', response?.name);
+      console.log('✅ Response email:', response?.email);
 
-      // Update user state with response from API
+      // Update user state with response from API - this triggers useEffect to update formData
       setUser(response);
       
       // Update localStorage (use adminUser for admin sessions)
       const storedUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
       const updatedStoredUser = { ...storedUser, ...response };
       localStorage.setItem('adminUser', JSON.stringify(updatedStoredUser));
+      console.log('✅ Updated localStorage with:', updatedStoredUser);
+      
+      // Explicitly update formData with the saved values to ensure UI reflects changes immediately
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          name: response.name || prev.name,
+          email: response.email || prev.email,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        };
+        console.log('✅ Updated formData:', updated);
+        return updated;
+      });
+      
+      console.log('✅ Updated formData name to:', response.name);
+      console.log('✅ Updated adminUser state to:', response);
       
       toast.success('Profile updated successfully!');
       
-      // Reset password fields
-      setFormData(prev => ({
-        ...prev,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      }));
+      // Force a small delay then reload profile to ensure UI is in sync
+      setTimeout(async () => {
+        try {
+          const freshProfile = await fetchAdminProfileData();
+          console.log('✅ Refreshed profile from API:', freshProfile);
+          setUser(freshProfile);
+          localStorage.setItem('adminUser', JSON.stringify(freshProfile));
+        } catch (refreshError) {
+          console.error('⚠️ Error refreshing profile:', refreshError);
+        }
+      }, 500);
       
     } catch (err) {
       console.error('Error:', err);
@@ -2673,12 +2781,6 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
       fileInputRef.current.value = '';
     }
     toast.info('Changes cancelled');
-  };
-
-  const handleDeleteAccount = () => {
-    toast.error('Account deletion requires confirmation', {
-      description: 'Please contact support to proceed with account deletion.'
-    });
   };
 
   // Get initials for avatar fallback
@@ -2979,24 +3081,6 @@ function AccountSettings({ user, setUser, showPasswords, togglePasswordVisibilit
           </div>
         </div>
       </div>
-
-      {/* Danger Zone */}
-      <div className="border border-red-200 dark:border-red-800 rounded-xl p-6 bg-red-50 dark:bg-red-900/20 w-full">
-        <div className="flex items-center gap-3 mb-4">
-          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-          <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h3>
-        </div>
-        <p className="text-sm text-red-600 dark:text-red-400/80 mb-4">
-          Once you delete your account, there is no going back. Please be certain.
-        </p>
-        <button 
-          onClick={handleDeleteAccount}
-          className="flex items-center gap-2 bg-red-600 text-white py-2.5 px-4 rounded-lg hover:bg-red-700 transition-all duration-200 text-sm font-medium"
-        >
-          <Trash2 size={16} />
-          Delete Account
-        </button>
-      </div>
     </div>
   );
 }
@@ -3106,7 +3190,7 @@ const SettingsPage = ({ darkMode, toggleDarkMode, adminUser, setAdminUser }) => 
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-              <Palette size={20} className="text-blue-600 dark:text-blue-400" />
+              <SettingsIcon size={20} className="text-blue-600 dark:text-blue-400" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
@@ -3116,7 +3200,7 @@ const SettingsPage = ({ darkMode, toggleDarkMode, adminUser, setAdminUser }) => 
         </div>
         
         <div className="px-6 pt-6">
-          <div className="grid grid-cols-3 bg-gray-100 dark:bg-gray-800 rounded-full p-1 w-full gap-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 bg-gray-100 dark:bg-gray-800 rounded-lg sm:rounded-full p-1.5 w-full gap-1.5">
             <SettingsTab active={activeTab === 'account'} onClick={() => setActiveTab('account')}>
               Account
             </SettingsTab>
@@ -3162,9 +3246,21 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDarkMode: darkMode, toggleDarkMode } = useTheme();
-  const [activePage, setActivePage] = useState("dashboard");
+  
+  // Initialize activePage from localStorage or default to "dashboard"
+  const [activePage, setActivePage] = useState(() => {
+    const savedPage = localStorage.getItem('adminActivePage');
+    return savedPage || "dashboard";
+  });
+  
   const [adminUser, setAdminUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Save activePage to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('adminActivePage', activePage);
+  }, [activePage]);
   
   // Early return if we're on the login page (shouldn't happen, but prevents rendering)
   if (location.pathname === '/admin/adminLogin') {
@@ -3351,35 +3447,35 @@ const AdminPanel = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-800 transition-colors duration-300 flex flex-col">
       {/* Header */}
       <div className="w-full bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700 transition-colors duration-300 sticky top-0 z-50 flex-shrink-0">
-        <div className="w-full px-6 py-3">
+        <div className="w-full px-4 sm:px-6 py-3">
           <nav className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
+                aria-label="Toggle menu"
+              >
+                {sidebarOpen ? (
+                  <X className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                ) : (
+                  <Menu className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                )}
+              </button>
               <div className="flex items-center gap-2">
                 <img
                   src={logo}
                   alt="SkillMatch Logo"
                   className="w-8 h-8 object-contain rounded-full"
                 />
-                <span className="font-semibold text-gray-700 dark:text-white">
-                  SkillMatch Admin
+                <span className="font-semibold text-gray-700 dark:text-white text-sm sm:text-base">
+                  <span className="hidden sm:inline">SkillMatch Admin</span>
+                  <span className="sm:hidden">Admin</span>
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              {/* Dark Mode Toggle */}
-              <button
-                onClick={toggleDarkMode}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200 flex items-center justify-center"
-                title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                aria-label={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              >
-                {darkMode ? (
-                  <Sun className="w-5 h-5 text-yellow-500" />
-                ) : (
-                  <Moon className="w-5 h-5 text-gray-600" />
-                )}
-              </button>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate max-w-[120px] sm:max-w-none">
                 {adminUser?.name || 'System Admin'}
               </div>
             </div>
@@ -3387,20 +3483,38 @@ const AdminPanel = () => {
         </div>
       </div>
 
+      {/* Mobile backdrop overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Content area */}
       <div className="flex flex-1 min-h-0">
-        {/* Sidebar*/}
-        <div className="w-64 bg-white dark:bg-gray-900 shadow-sm border-r border-gray-200 dark:border-gray-700 flex-shrink-0 sticky top-[60px] h-[calc(100vh-60px)]">
+        {/* Sidebar - Hidden on mobile, overlay when open */}
+        <div className={`
+          fixed lg:static inset-y-0 left-0 z-50 lg:z-auto
+          w-64 bg-white dark:bg-gray-900 shadow-sm border-r border-gray-200 dark:border-gray-700
+          flex-shrink-0 
+          lg:sticky lg:top-[60px] lg:h-[calc(100vh-60px)]
+          transform transition-transform duration-300 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}>
           <Sidebar 
             activePage={activePage} 
-            setActivePage={setActivePage}
+            setActivePage={(page) => {
+              setActivePage(page);
+              setSidebarOpen(false); // Close sidebar on mobile when navigating
+            }}
             adminUser={adminUser}
           />
         </div>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="p-6">
+        <main className="flex-1 overflow-y-auto w-full">
+          <div className="p-4 sm:p-6">
             {renderContent()}
           </div>
         </main>

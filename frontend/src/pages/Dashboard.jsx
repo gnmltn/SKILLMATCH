@@ -358,8 +358,8 @@ export default function Dashboard() {
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <section className="lg:col-span-2 bg-card rounded-xl border border-border p-6 hover:shadow-md transition-all duration-200">
-            <div className="flex items-center gap-3 mb-4">
+          <section className="lg:col-span-2 bg-card rounded-xl border border-border p-6 hover:shadow-md transition-all duration-200 flex flex-col">
+            <div className="flex items-center gap-3 mb-4 flex-shrink-0">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <TrendingUp size={20} className="text-primary" />
               </div>
@@ -370,16 +370,18 @@ export default function Dashboard() {
             </div>
 
             {skills.length === 0 ? (
-              <div className="text-center py-8 bg-muted/30 rounded-lg border border-border">
+              <div className="text-center py-4 bg-muted/30 rounded-lg border border-border flex-1 flex flex-col justify-center">
                 <div className="text-sm text-muted-foreground mb-4">
                   No skills added yet. Start building your skills profile!
                 </div>
-                <button 
-                  onClick={() => navigate('/profile')}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm text-success bg-success/10 rounded-[12px] hover:bg-success/20 border border-success/20 transition-colors"
-                >
-                  <Plus size={16} /> Add Your First Skill
-                </button>
+                <div className="flex justify-center">
+                  <button 
+                    onClick={() => navigate('/profile')}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm text-success bg-transparent rounded-lg hover:bg-success/10 border border-border transition-colors"
+                  >
+                    <Plus size={16} className="text-success" /> Add Your First Skill
+                  </button>
+                </div>
               </div>
             ) : (
               <>
@@ -489,9 +491,9 @@ export default function Dashboard() {
               </div>
               <button 
                 onClick={() => navigate('/profile')}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-success bg-success/10 rounded-[12px] hover:bg-success/20 border border-success/20 transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm text-success bg-transparent rounded-lg hover:bg-success/10 border border-border transition-colors"
               >
-                <Plus size={16} /> Add More Skills
+                <Plus size={16} className="text-success" /> Add More Skills
               </button>
             </div>
           ) : (
@@ -551,21 +553,21 @@ export default function Dashboard() {
         <section className={`mt-8 rounded-2xl border-2 border-primary/20 p-6 transition-colors duration-200 ${
           isDarkMode ? 'bg-[#1e293b]' : 'bg-card'
         }`}>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-200 ${
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-200 flex-shrink-0 ${
                 isDarkMode ? 'bg-[#1e293b]' : 'bg-muted/30'
               }`}>
                 <Briefcase size={20} className={isDarkMode ? 'text-white' : 'text-card-foreground'} />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <h3 className="text-lg font-semibold text-card-foreground">Your Career Path Match</h3>
                 <p className="text-sm text-muted-foreground">Discover careers that align with your skills</p>
               </div>
             </div>
             <button 
               onClick={handleExploreCareers}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-[12px] hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary bg-transparent rounded-lg hover:bg-primary/10 border border-border transition-colors flex-shrink-0 ml-auto sm:ml-0"
             >
               Explore Careers <ChevronRight size={16} />
             </button>

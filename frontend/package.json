@@ -12,6 +12,7 @@
     "test:mobile:watch": "nodemon run-mobile-tests.js"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.12.2",
     "@tailwindcss/vite": "^4.1.14",
     "axios": "^1.12.2",
     "chart.js": "^4.5.1",

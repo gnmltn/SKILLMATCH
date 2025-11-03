@@ -90,11 +90,12 @@ router.get("/", protect, async (req, res) => {
 
     
     const recommendations = [];
+    const dismissedSuggestions = user.dismissedSuggestions || [];
     
     
     user.skills.forEach(skill => {
       
-      if (skill.level <= 75) {
+      if (skill.level <= 75 && !dismissedSuggestions.includes(skill.name)) {
         const recommendation = generateSkillRecommendation(skill);
         if (recommendation) {
           recommendations.push(recommendation);
@@ -108,6 +109,7 @@ router.get("/", protect, async (req, res) => {
     return res.status(200).json({
       success: true,
       recommendations: recommendations,
+      dismissedSuggestions: dismissedSuggestions,
       user: {
         firstName: user.firstName,
         lastName: user.lastName,
@@ -184,5 +186,48 @@ function getDefaultResources(skillName) {
     }
   ];
 }
+
+router.post("/dismiss", protect, async (req, res) => {
+  try {
+    const { skillName } = req.body;
+    
+    if (!skillName) {
+      return res.status(400).json({
+        success: false,
+        message: "Skill name is required"
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    if (!user.dismissedSuggestions) {
+      user.dismissedSuggestions = [];
+    }
+
+    if (!user.dismissedSuggestions.includes(skillName)) {
+      user.dismissedSuggestions.push(skillName);
+      await user.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Suggestion for ${skillName} dismissed successfully`,
+      dismissedSuggestions: user.dismissedSuggestions
+    });
+  } catch (error) {
+    console.error("Error dismissing suggestion:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error dismissing suggestion"
+    });
+  }
+});
 
 export default router;
