@@ -236,6 +236,10 @@ const userSchema = new mongoose.Schema(
     isOnline: {
       type: Boolean,
       default: false
+    },
+    dismissedSuggestions: {
+      type: [String],
+      default: []
     }
   },
   { timestamps: true }

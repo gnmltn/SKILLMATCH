@@ -92,12 +92,14 @@ router.post("/signup", async (req, res) => {
     }
 
     // Enhanced password validation
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
     const hasNumber = /\d/.test(password);
     const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
-    if (!hasNumber || !hasSpecialChar) {
+    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecialChar) {
       return res.status(400).json({ 
         success: false,
-        message: "Password must contain at least 1 number and 1 special character" 
+        message: "Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character" 
       });
     }
 

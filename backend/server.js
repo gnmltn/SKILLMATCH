@@ -13,6 +13,8 @@ import dashboardRoutes from './routes/dashboard.js';
 import adminRoutes from './routes/adminRoutes.js';
 import adminSettings from './routes/adminSettings.js';
 import { connectDB } from './config/db.js';
+import User from './models/User.js';
+import { checkMaintenanceMode } from './middleware/systemSettings.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -35,8 +37,12 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Apply maintenance mode check to all routes (except admin routes)
+app.use(checkMaintenanceMode);
+
 // Routes
 app.use('/api/users', authRoutes);
+app.use('/api/auth', authRoutes); // Add auth routes at /api/auth for Google login endpoint
 app.use('/api/admin', adminAuthRoutes); // ADD THIS LINE
 app.use('/api/password-reset', passwordResetRoutes);
 app.use('/api/profile', profileRoutes);
@@ -125,6 +131,41 @@ const startServer = async () => {
 
     await connectDB();
 
+    // Start cleanup job to mark users offline if they haven't sent heartbeat
+    const startCleanupJob = () => {
+      const CLEANUP_INTERVAL = 30000; // Run every 30 seconds
+      const OFFLINE_THRESHOLD = 20000; // Mark offline if no heartbeat for 20 seconds
+      
+      setInterval(async () => {
+        try {
+          const thresholdTime = new Date(Date.now() - OFFLINE_THRESHOLD);
+          
+          // Find users who are marked as online but haven't sent heartbeat recently
+          const result = await User.updateMany(
+            {
+              isOnline: true,
+              $or: [
+                { lastActivity: { $lt: thresholdTime } },
+                { lastActivity: { $exists: false } },
+                { lastActivity: null }
+              ]
+            },
+            {
+              $set: { isOnline: false }
+            }
+          );
+          
+          if (result.modifiedCount > 0) {
+            console.log(`🔄 Cleanup: Marked ${result.modifiedCount} user(s) as offline`);
+          }
+        } catch (error) {
+          console.error('❌ Cleanup job error:', error);
+        }
+      }, CLEANUP_INTERVAL);
+      
+      console.log('✅ User status cleanup job started');
+    };
+
     app.listen(PORT, () => {
       console.log('\n========================================');
       console.log(`Server is running on port ${PORT}`);
@@ -135,6 +176,9 @@ const startServer = async () => {
       console.log(`JWT Secret: ${process.env.JWT_SECRET ? 'Set' : 'Not set'}`);
       console.log(`Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? 'Configured' : 'Not configured'}`);
       console.log('========================================\n');
+      
+      // Start cleanup job after server starts
+      startCleanupJob();
     });
   } catch (error) {
     console.error(`Failed to start server: ${error.message}`);

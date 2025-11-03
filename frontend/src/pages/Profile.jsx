@@ -391,9 +391,9 @@ export default function Profile() {
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Card */}
         <section className="bg-card rounded-xl border border-border p-6 mb-6 hover:shadow-md transition-all duration-200">
-          <div className="flex items-start justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="relative group">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              <div className="relative group flex-shrink-0">
                 {userData?.profilePicture ? (
                   <img
                     src={userData.profilePicture}
@@ -406,7 +406,7 @@ export default function Profile() {
                   </div>
                 )}
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <h1 className="text-xl font-semibold text-card-foreground">
                   {userData?.firstName} {userData?.lastName}
                 </h1>
@@ -419,7 +419,7 @@ export default function Profile() {
             </div>
             <button
               onClick={() => setShowEditProfile(true)}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm text-card-foreground border border-border rounded-[12px] hover:bg-muted transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-card-foreground border border-border rounded-lg hover:bg-muted transition-colors flex-shrink-0"
             >
               <Edit3 size={16} /> Edit Profile
             </button>
@@ -427,7 +427,7 @@ export default function Profile() {
 
           {/* Tabs */}
           <div className="mt-6">
-            <div className="inline-flex bg-muted rounded-full p-1">
+            <div className="inline-flex bg-muted rounded-full p-1.5 gap-1.5">
               <Tab active={activeTab === 'skills'} onClick={() => setActiveTab('skills')}>
                 Skills
               </Tab>
@@ -656,7 +656,7 @@ function Tab({ children, active, onClick }) {
     <button
       onClick={onClick}
       className={
-        `px-3 py-1.5 text-sm rounded-full transition ` +
+        `px-4 py-2.5 text-sm font-medium rounded-full transition ` +
         (active ? 'bg-card text-card-foreground shadow-sm border border-border' : 'text-muted-foreground hover:text-card-foreground')
       }
     >
@@ -693,7 +693,7 @@ function SkillRow({ skill, onDelete, onEdit }) {
         </div>
         <div className="flex items-center gap-2">
           <div className="text-sm font-semibold text-muted-foreground">{skill.level}%</div>
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-2">
             <button
               onClick={onEdit}
               className="text-xs text-primary hover:text-primary/80 transition-colors"

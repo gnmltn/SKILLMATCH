@@ -1311,6 +1311,29 @@ export const skillAssessmentData = {
         "Can implement advanced system hardening and security controls",
         "Can lead security operations and incident response teams"
       ]
+    },
+    "Networking": {
+      BEGINNER: [
+        "Can understand basic networking concepts (TCP/IP, OSI model)",
+        "Can configure basic network devices (routers, switches, access points)",
+        "Can troubleshoot basic network connectivity issues",
+        "Can understand IP addressing, subnetting, and DNS",
+        "Can use basic network diagnostic tools (ping, traceroute, ipconfig)"
+      ],
+      INTERMEDIATE: [
+        "Can design and implement network architectures",
+        "Can configure VLANs, routing protocols (OSPF, BGP), and network security",
+        "Can troubleshoot complex network issues and performance problems",
+        "Can implement network monitoring and management solutions",
+        "Can work with wireless network technologies and protocols"
+      ],
+      EXPERT: [
+        "Can architect enterprise-level network infrastructure",
+        "Can implement software-defined networking (SDN) and network automation",
+        "Can design and deploy cloud network architectures",
+        "Can lead network transformation and optimization initiatives",
+        "Can establish networking best practices and standards for organizations"
+      ]
     }
   },
 

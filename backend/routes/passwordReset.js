@@ -175,12 +175,14 @@ router.post("/reset-password", async (req, res) => {
     }
 
     // Enhanced password validation
+    const hasUppercase = /[A-Z]/.test(newPassword);
+    const hasLowercase = /[a-z]/.test(newPassword);
     const hasNumber = /\d/.test(newPassword);
     const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword);
-    if (!hasNumber || !hasSpecialChar) {
+    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecialChar) {
       return res.status(400).json({ 
         success: false,
-        message: "Password must contain at least 1 number and 1 special character" 
+        message: "Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character" 
       });
     }
 

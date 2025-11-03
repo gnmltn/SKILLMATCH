@@ -125,10 +125,12 @@ const ForgotPassword = () => {
       return;
     }
 
+    const hasUppercase = /[A-Z]/.test(newPassword);
+    const hasLowercase = /[a-z]/.test(newPassword);
     const hasNumber = /\d/.test(newPassword);
     const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword);
-    if (!hasNumber || !hasSpecialChar) {
-      setError('Password must contain at least 1 number and 1 special character');
+    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecialChar) {
+      setError('Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character');
       return;
     }
 
@@ -386,7 +388,7 @@ const ForgotPassword = () => {
                 </button>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Must be at least 8 characters with 1 number and 1 special character
+                Must be at least 8 characters with 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character
               </p>
             </div>
 

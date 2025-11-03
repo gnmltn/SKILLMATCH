@@ -83,6 +83,10 @@ export default function Suggestions() {
 
         if (suggestionsResponse.data.success) {
           setRecommendations(suggestionsResponse.data.recommendations || []);
+          // Load dismissed suggestions from backend
+          if (suggestionsResponse.data.dismissedSuggestions) {
+            setHiddenRecommendations(new Set(suggestionsResponse.data.dismissedSuggestions));
+          }
         } else {
           throw new Error('Failed to fetch recommendations');
         }
@@ -114,11 +118,38 @@ export default function Suggestions() {
 
   const highPriorityCount = visibleRecommendations.filter(rec => rec.priority === 'HIGH').length;
 
-  const handleNotInterested = (skillName) => {
-    setHiddenRecommendations(prev => new Set([...prev, skillName]));
-    toast.info(`Hidden recommendation for ${skillName}`, {
-      description: 'You can adjust your preferences in Settings'
-    });
+  const handleNotInterested = async (skillName) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Optimistically update UI
+      setHiddenRecommendations(prev => new Set([...prev, skillName]));
+      
+      // Call backend API to persist dismissal
+      await axios.post(`${API_BASE_URL}/suggestions/dismiss`, 
+        { skillName },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      toast.success(`Removed recommendation for ${skillName}`, {
+        description: 'This suggestion will no longer appear'
+      });
+    } catch (err) {
+      console.error('Error dismissing suggestion:', err);
+      
+      // Revert UI change on error
+      setHiddenRecommendations(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(skillName);
+        return newSet;
+      });
+      
+      toast.error('Failed to remove suggestion. Please try again.');
+    }
   };
 
   const handleStartLearning = (skillName) => {

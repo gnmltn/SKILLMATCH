@@ -109,7 +109,7 @@ export default function RoleHistory() {
     const totalProjects = projects.length;
     
     const avgPerformance = totalProjects > 0 
-      ? Math.round(projects.reduce((sum, project) => sum + project.performance, 0) / totalProjects)
+      ? parseFloat((projects.reduce((sum, project) => sum + parseFloat(project.performance), 0) / totalProjects).toFixed(2))
       : 0;
     
     const totalTeamMembers = projects.reduce((sum, project) => {
@@ -389,11 +389,37 @@ export default function RoleHistory() {
     
     if (!formData.title.trim()) errors.title = 'Project title is required';
     if (!formData.role.trim()) errors.role = 'Role is required';
-    if (!formData.performance.trim()) errors.performance = 'Performance score is required';
-    else if (isNaN(formData.performance) || formData.performance < 0 || formData.performance > 100) {
-      errors.performance = 'Performance score must be between 0 and 100';
+    if (!formData.performance.trim()) {
+      errors.performance = 'Performance score is required';
+    } else {
+      const performanceValue = parseFloat(formData.performance);
+      if (isNaN(performanceValue)) {
+        errors.performance = 'Performance score must be a valid number';
+      } else if (performanceValue < 0) {
+        errors.performance = 'Performance score must be at least 0';
+      } else if (performanceValue > 100) {
+        errors.performance = 'Performance score cannot exceed 100';
+        toast.error('Performance score cannot exceed 100%', {
+          description: 'Please enter a score between 0 and 100.',
+          duration: 5000
+        });
+      }
     }
-    if (!formData.date.trim()) errors.date = 'Completion date is required';
+    
+    if (!formData.date.trim()) {
+      errors.date = 'Completion date is required';
+    } else {
+      const selectedDate = new Date(formData.date);
+      const currentYear = new Date().getFullYear();
+      const selectedYear = selectedDate.getFullYear();
+      if (selectedYear > currentYear) {
+        errors.date = `Completion date cannot be in the future. Maximum year allowed: ${currentYear}`;
+        toast.error(`Completion date cannot be in the future`, {
+          description: `The maximum year allowed is ${currentYear}.`,
+          duration: 5000
+        });
+      }
+    }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -413,7 +439,7 @@ export default function RoleHistory() {
         role: formData.role.trim(),
         teamMembers: formData.teamMembers.trim() ? formData.teamMembers.split(',').map(m => m.trim()) : [],
         skills: formData.skills.trim() ? formData.skills.split(',').map(s => s.trim()) : [],
-        performance: parseInt(formData.performance),
+        performance: parseFloat(formData.performance),
         date: formData.date.trim(),
         notes: formData.notes.trim(),
         imageUrl: formData.imagePreview || '',
@@ -452,7 +478,7 @@ export default function RoleHistory() {
         role: formData.role.trim(),
         teamMembers: formData.teamMembers.trim() ? formData.teamMembers.split(',').map(m => m.trim()) : [],
         skills: formData.skills.trim() ? formData.skills.split(',').map(s => s.trim()) : [],
-        performance: parseInt(formData.performance),
+        performance: parseFloat(formData.performance),
         date: formData.date.trim(),
         notes: formData.notes.trim(),
         imageUrl: formData.imagePreview || '',
@@ -624,7 +650,7 @@ export default function RoleHistory() {
         links={[
           { to: '/dashboard', label: 'Dashboard' },
           { to: '/profile', label: 'Profile' },
-          { to: '/roles', label: 'Role History' },
+          { to: '/roles', label: 'Project History' },
           { to: '/suggestions', label: 'Suggestions' },
           { to: '/career-paths', label: 'Career Paths' },
         ]}
@@ -756,7 +782,7 @@ export default function RoleHistory() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPerformanceColor(project.performance)}`}>
-                          {project.performance}%
+                          {parseFloat(project.performance).toFixed(2)}%
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -1020,9 +1046,10 @@ export default function RoleHistory() {
                       name="performance"
                       value={formData.performance}
                       onChange={handleInputChange}
-                      placeholder="85"
+                      placeholder="85.50"
                       min="0"
                       max="100"
+                      step="0.01"
                       className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700 transition-colors ${
                         formErrors.performance ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                       }`}
@@ -1041,6 +1068,7 @@ export default function RoleHistory() {
                       name="date"
                       value={formData.date}
                       onChange={handleInputChange}
+                      max={new Date().toISOString().split('T')[0]}
                       className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700 transition-colors ${
                         formErrors.date ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                       }`}
@@ -1198,9 +1226,10 @@ export default function RoleHistory() {
                       name="performance"
                       value={formData.performance}
                       onChange={handleInputChange}
-                      placeholder="85"
+                      placeholder="85.50"
                       min="0"
                       max="100"
+                      step="0.01"
                       className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700 transition-colors ${
                         formErrors.performance ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                       }`}
@@ -1219,6 +1248,7 @@ export default function RoleHistory() {
                       name="date"
                       value={formData.date}
                       onChange={handleInputChange}
+                      max={new Date().toISOString().split('T')[0]}
                       className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700 transition-colors ${
                         formErrors.date ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                       }`}

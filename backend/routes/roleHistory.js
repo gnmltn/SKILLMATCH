@@ -96,7 +96,7 @@ router.post("/", protect, async (req, res) => {
       date: date.trim(),
       team: teamString,
       skills: skills || [],
-      score: parseInt(performance),
+      score: parseFloat(performance),
       description: notes || "",
       imageUrl: imageUrl || "",
       projectImages: projectImages || [],
@@ -183,7 +183,7 @@ router.patch("/:projectId", protect, async (req, res) => {
         if (date !== undefined) project.date = date.trim();
         if (teamMembers !== undefined) project.team = teamString;
         if (skills !== undefined) project.skills = skills;
-        if (performance !== undefined) project.score = parseInt(performance);
+        if (performance !== undefined) project.score = parseFloat(performance);
         if (notes !== undefined) project.description = notes;
         if (imageUrl !== undefined) project.imageUrl = imageUrl.trim();
         if (projectImages !== undefined) project.projectImages = projectImages;
