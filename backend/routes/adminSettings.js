@@ -1,19 +1,27 @@
 import express from 'express';
 import { adminAuth } from './adminAuth.js';
+import Settings from '../models/Settings.js';
+import ActivityLog from '../models/ActivityLog.js';
 
 const router = express.Router();
 
 // GET SYSTEM SETTINGS
 router.get('/system', adminAuth, async (req, res) => {
   try {
-    // In a real application, you'd store these in a database
-    // For now, we'll return default settings
+    const settings = await Settings.getSettings();
+    
     const systemSettings = {
-      allowRegistrations: true,
-      emailVerification: true,
-      maintenanceMode: false,
-      sessionTimeout: 30,
-      maxLoginAttempts: 5
+      allowRegistrations: settings.allowRegistrations,
+      emailVerification: settings.emailVerification,
+      maintenanceMode: settings.maintenanceMode,
+      maintenanceMessage: settings.maintenanceMessage,
+      sessionTimeout: settings.sessionTimeout,
+      maxLoginAttempts: settings.maxLoginAttempts,
+      siteName: settings.siteName,
+      siteDescription: settings.siteDescription,
+      contactEmail: settings.contactEmail,
+      maxFileSize: settings.maxFileSize,
+      allowedFileTypes: settings.allowedFileTypes
     };
 
     res.json({
@@ -34,35 +42,92 @@ router.get('/system', adminAuth, async (req, res) => {
 // UPDATE SYSTEM SETTINGS
 router.put('/system', adminAuth, async (req, res) => {
   try {
-    const settings = req.body;
+    const settingsData = req.body;
 
     // Validate settings
-    if (settings.sessionTimeout && (settings.sessionTimeout < 1 || settings.sessionTimeout > 480)) {
+    if (settingsData.sessionTimeout !== undefined && (settingsData.sessionTimeout < 1 || settingsData.sessionTimeout > 480)) {
       return res.status(400).json({
         success: false,
         message: 'Session timeout must be between 1 and 480 minutes'
       });
     }
 
-    if (settings.maxLoginAttempts && (settings.maxLoginAttempts < 1 || settings.maxLoginAttempts > 10)) {
+    if (settingsData.maxLoginAttempts !== undefined && (settingsData.maxLoginAttempts < 1 || settingsData.maxLoginAttempts > 10)) {
       return res.status(400).json({
         success: false,
         message: 'Max login attempts must be between 1 and 10'
       });
     }
 
-    // In a real application, you'd save these to a database
-    // For now, we'll just return success
+    // Get current settings
+    const settings = await Settings.getSettings();
+    
+    // Update settings from request body
+    if (settingsData.allowRegistrations !== undefined) {
+      settings.allowRegistrations = settingsData.allowRegistrations;
+    }
+    if (settingsData.emailVerification !== undefined) {
+      settings.emailVerification = settingsData.emailVerification;
+    }
+    if (settingsData.maintenanceMode !== undefined) {
+      settings.maintenanceMode = settingsData.maintenanceMode;
+    }
+    if (settingsData.maintenanceMessage !== undefined) {
+      settings.maintenanceMessage = settingsData.maintenanceMessage;
+    }
+    if (settingsData.sessionTimeout !== undefined) {
+      settings.sessionTimeout = settingsData.sessionTimeout;
+    }
+    if (settingsData.maxLoginAttempts !== undefined) {
+      settings.maxLoginAttempts = settingsData.maxLoginAttempts;
+    }
+    if (settingsData.siteName !== undefined) {
+      settings.siteName = settingsData.siteName;
+    }
+    if (settingsData.siteDescription !== undefined) {
+      settings.siteDescription = settingsData.siteDescription;
+    }
+    if (settingsData.contactEmail !== undefined) {
+      settings.contactEmail = settingsData.contactEmail;
+    }
+    if (settingsData.maxFileSize !== undefined) {
+      settings.maxFileSize = settingsData.maxFileSize;
+    }
+    if (settingsData.allowedFileTypes !== undefined) {
+      settings.allowedFileTypes = settingsData.allowedFileTypes;
+    }
+
+    // Save to database
+    await settings.save();
 
     // Log the activity
-    await req.user.logActivity('updated system settings', 'settings', {
-      changes: settings
+    await ActivityLog.create({
+      user: `Admin: ${req.user.firstName} ${req.user.lastName}`,
+      action: 'Updated system settings',
+      type: 'system',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      metadata: { settings: settingsData }
     });
+
+    const updatedSettings = {
+      allowRegistrations: settings.allowRegistrations,
+      emailVerification: settings.emailVerification,
+      maintenanceMode: settings.maintenanceMode,
+      maintenanceMessage: settings.maintenanceMessage,
+      sessionTimeout: settings.sessionTimeout,
+      maxLoginAttempts: settings.maxLoginAttempts,
+      siteName: settings.siteName,
+      siteDescription: settings.siteDescription,
+      contactEmail: settings.contactEmail,
+      maxFileSize: settings.maxFileSize,
+      allowedFileTypes: settings.allowedFileTypes
+    };
 
     res.json({
       success: true,
       message: 'System settings updated successfully',
-      data: settings
+      data: updatedSettings
     });
 
   } catch (error) {

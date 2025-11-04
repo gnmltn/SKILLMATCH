@@ -23,6 +23,24 @@ const skillSchema = new mongoose.Schema({
     ],
     required: true,
   },
+  assessmentActivities: {
+    type: {
+      BEGINNER: [{
+        text: String,
+        checked: Boolean
+      }],
+      INTERMEDIATE: [{
+        text: String,
+        checked: Boolean
+      }],
+      EXPERT: [{
+        text: String,
+        checked: Boolean
+      }]
+    },
+    default: null,
+    _id: false
+  },
   createdAt: {
     type: Date,
     default: Date.now,

@@ -140,7 +140,8 @@ export default function Dashboard() {
 
         // Calculate summary stats
         const skillsMastered = userSkills.filter(skill => skill.level >= 80).length;
-        const skillsInProgress = userSkills.filter(skill => skill.level >= 50 && skill.level < 80).length;
+        // Count all skills that are not yet complete (less than 100%)
+        const skillsInProgress = userSkills.filter(skill => skill.level > 0 && skill.level < 100).length;
         const skillGaps = suggestions.length;
         const projects = profileResponse.data.projectHistory?.length || 0;
 

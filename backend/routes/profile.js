@@ -177,7 +177,7 @@ router.patch("/avatar", protect, async (req, res) => {
 
 router.post("/skills", protect, async (req, res) => {
   try {
-    const { name, level, category } = req.body;
+    const { name, level, category, assessmentActivities } = req.body;
 
     if (!name?.trim() || level === undefined || level === null || !category?.trim()) {
       console.log("Missing required fields");
@@ -225,7 +225,8 @@ router.post("/skills", protect, async (req, res) => {
     const newSkill = {
       name: name.trim(),
       level: Math.round(level),
-      category: category.trim()
+      category: category.trim(),
+      ...(assessmentActivities && { assessmentActivities })
     };
 
    
@@ -268,7 +269,7 @@ router.post("/skills", protect, async (req, res) => {
 router.patch("/skills/:skillId", protect, async (req, res) => {
   try {
     const { skillId } = req.params;
-    const { level, name } = req.body;
+    const { level, name, assessmentActivities } = req.body;
 
     if (level && (level < 0 || level > 100)) {
       return res.status(400).json({ message: "Level must be between 0 and 100" });
@@ -289,6 +290,7 @@ router.patch("/skills/:skillId", protect, async (req, res) => {
     
     if (level !== undefined) skill.level = level;
     if (name !== undefined) skill.name = name;
+    if (assessmentActivities !== undefined) skill.assessmentActivities = assessmentActivities;
 
     await user.save();
 

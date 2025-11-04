@@ -2273,17 +2273,60 @@ function SystemSettings({ user, setUser }) {
   };
 
   const handleNumberChange = (key, value) => {
-    setSystemSettings(prev => ({
-      ...prev,
-      [key]: Math.max(1, parseInt(value) || 1)
-    }));
+    // Allow empty string temporarily while user is typing
+    if (value === '' || value === null || value === undefined) {
+      setSystemSettings(prev => ({
+        ...prev,
+        [key]: ''
+      }));
+      return;
+    }
+    
+    // Parse the value and ensure it's within valid range
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue)) {
+      // Different max values for different fields
+      const maxValue = key === 'sessionTimeout' ? 480 : 10;
+      setSystemSettings(prev => ({
+        ...prev,
+        [key]: Math.max(1, Math.min(maxValue, numValue)) // Clamp between 1 and max
+      }));
+    }
   };
 
   const handleSave = async () => {
     try {
       setIsLoading(true);
-      await updateSystemSettings(systemSettings);
+      
+      // Validate numeric fields before saving
+      const settingsToSave = { ...systemSettings };
+      
+      // Ensure sessionTimeout is a valid number
+      if (!settingsToSave.sessionTimeout || settingsToSave.sessionTimeout === '' || isNaN(settingsToSave.sessionTimeout)) {
+        toast.error('Please enter a valid session timeout value (1-480 minutes)');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Ensure maxLoginAttempts is a valid number
+      if (!settingsToSave.maxLoginAttempts || settingsToSave.maxLoginAttempts === '' || isNaN(settingsToSave.maxLoginAttempts)) {
+        toast.error('Please enter a valid max login attempts value (1-10)');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Convert to numbers to ensure proper type
+      settingsToSave.sessionTimeout = parseInt(settingsToSave.sessionTimeout, 10);
+      settingsToSave.maxLoginAttempts = parseInt(settingsToSave.maxLoginAttempts, 10);
+      
+      await updateSystemSettings(settingsToSave);
       toast.success('System settings saved successfully!');
+      
+      // Trigger immediate refresh of session timeout in InactivityTracker
+      window.dispatchEvent(new CustomEvent('sessionTimeoutUpdated'));
+      // Also trigger storage event for cross-tab communication
+      localStorage.setItem('systemSettingsUpdated', Date.now().toString());
+      setTimeout(() => localStorage.removeItem('systemSettingsUpdated'), 100);
     } catch (error) {
       console.error('❌ Error:', error);
       toast.error('Failed to save system settings');
@@ -2403,8 +2446,14 @@ function SystemSettings({ user, setUser }) {
                       type="number"
                       min="1"
                       max="480"
-                      value={systemSettings.sessionTimeout}
+                      value={systemSettings.sessionTimeout || ''}
                       onChange={(e) => handleNumberChange('sessionTimeout', e.target.value)}
+                      onBlur={(e) => {
+                        // If empty on blur, reset to 1 (minimum valid value)
+                        if (e.target.value === '' || e.target.value === null) {
+                          handleNumberChange('sessionTimeout', '1');
+                        }
+                      }}
                       className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     />
                     <span className="text-sm text-gray-600 dark:text-gray-400">minutes</span>
@@ -2423,8 +2472,14 @@ function SystemSettings({ user, setUser }) {
                       type="number"
                       min="1"
                       max="10"
-                      value={systemSettings.maxLoginAttempts}
+                      value={systemSettings.maxLoginAttempts || ''}
                       onChange={(e) => handleNumberChange('maxLoginAttempts', e.target.value)}
+                      onBlur={(e) => {
+                        // If empty on blur, reset to 1 (minimum valid value)
+                        if (e.target.value === '' || e.target.value === null) {
+                          handleNumberChange('maxLoginAttempts', '1');
+                        }
+                      }}
                       className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     />
                     <span className="text-sm text-gray-600 dark:text-gray-400">attempts</span>

@@ -173,6 +173,62 @@ export default function Profile() {
     setShowSkillAssessment(true);
   };
 
+  // Helper function to reconstruct assessment state from skill level
+  // Uses reverse engineering from the score formula: beginnerChecked * 8 + intermediateChecked * 6 + expertChecked * 6
+  const reconstructAssessmentFromLevel = (skillLevel, skillActivities) => {
+    const activities = {
+      BEGINNER: skillActivities.BEGINNER.map((activity) => ({ text: activity, checked: false })),
+      INTERMEDIATE: skillActivities.INTERMEDIATE.map((activity) => ({ text: activity, checked: false })),
+      EXPERT: skillActivities.EXPERT.map((activity) => ({ text: activity, checked: false })),
+    };
+
+    if (skillLevel <= 0) {
+      return activities;
+    }
+
+    // Reverse engineer from score formula: score = beginnerChecked * 8 + intermediateChecked * 6 + expertChecked * 6
+    // Target score is the skillLevel
+    let remainingScore = skillLevel;
+    const beginnerTotal = skillActivities.BEGINNER.length;
+    const intermediateTotal = skillActivities.INTERMEDIATE.length;
+    const expertTotal = skillActivities.EXPERT.length;
+
+    // Strategy: Fill in order of priority (Beginner -> Intermediate -> Expert)
+    // to match the score as closely as possible
+    
+    // Calculate beginner activities to check
+    const beginnerScore = Math.min(remainingScore, beginnerTotal * 8);
+    const beginnerChecked = Math.floor(beginnerScore / 8);
+    for (let i = 0; i < beginnerChecked; i++) {
+      activities.BEGINNER[i].checked = true;
+    }
+    remainingScore -= beginnerChecked * 8;
+
+    // If we have remaining score, check intermediate activities
+    if (remainingScore > 0 && beginnerChecked >= Math.ceil(beginnerTotal * 0.5)) {
+      const intermediateScore = Math.min(remainingScore, intermediateTotal * 6);
+      const intermediateChecked = Math.floor(intermediateScore / 6);
+      for (let i = 0; i < intermediateChecked; i++) {
+        activities.INTERMEDIATE[i].checked = true;
+      }
+      remainingScore -= intermediateChecked * 6;
+    }
+
+    // If we still have remaining score, check expert activities
+    if (remainingScore > 0) {
+      const intermediateCheckedCount = activities.INTERMEDIATE.filter(a => a.checked).length;
+      if (intermediateCheckedCount >= Math.ceil(intermediateTotal * 0.7)) {
+        const expertScore = Math.min(remainingScore, expertTotal * 6);
+        const expertChecked = Math.floor(expertScore / 6);
+        for (let i = 0; i < expertChecked; i++) {
+          activities.EXPERT[i].checked = true;
+        }
+      }
+    }
+
+    return activities;
+  };
+
   const handleEditSkill = (skill) => {
     // Set the category and skill name for the assessment
     setSelectedCategory(skill.category);
@@ -186,15 +242,43 @@ export default function Profile() {
       return;
     }
 
-    // Initialize assessment with all activities unchecked (user will redo the assessment)
+    // If the skill has saved assessment activities, use them; otherwise reconstruct from level
+    let activitiesToUse;
+    if (skill.assessmentActivities) {
+      // Use saved assessment activities, but ensure they match current skill activities structure
+      // (in case assessment questions have changed)
+      activitiesToUse = {
+        BEGINNER: skillActivities.BEGINNER.map((activity, index) => {
+          const savedActivity = skill.assessmentActivities.BEGINNER?.[index];
+          return {
+            text: activity,
+            checked: savedActivity && savedActivity.text === activity ? savedActivity.checked : false
+          };
+        }),
+        INTERMEDIATE: skillActivities.INTERMEDIATE.map((activity, index) => {
+          const savedActivity = skill.assessmentActivities.INTERMEDIATE?.[index];
+          return {
+            text: activity,
+            checked: savedActivity && savedActivity.text === activity ? savedActivity.checked : false
+          };
+        }),
+        EXPERT: skillActivities.EXPERT.map((activity, index) => {
+          const savedActivity = skill.assessmentActivities.EXPERT?.[index];
+          return {
+            text: activity,
+            checked: savedActivity && savedActivity.text === activity ? savedActivity.checked : false
+          };
+        }),
+      };
+    } else {
+      // Fallback: reconstruct assessment state from the skill's current level
+      activitiesToUse = reconstructAssessmentFromLevel(skill.level, skillActivities);
+    }
+
     setAssessmentData({
       category: skill.category,
       skill: skill.name,
-      activities: {
-        BEGINNER: skillActivities.BEGINNER.map((activity) => ({ text: activity, checked: false })),
-        INTERMEDIATE: skillActivities.INTERMEDIATE.map((activity) => ({ text: activity, checked: false })),
-        EXPERT: skillActivities.EXPERT.map((activity) => ({ text: activity, checked: false })),
-      },
+      activities: activitiesToUse,
     });
     setShowSkillAssessment(true);
   };
@@ -204,10 +288,13 @@ export default function Profile() {
       const token = localStorage.getItem('token');
       
       if (editingSkillId) {
-        // Update existing skill
+        // Update existing skill with assessment activities
         const response = await axios.patch(
           `${API_BASE_URL}/profile/skills/${editingSkillId}`,
-          { level: proficiencyLevel },
+          { 
+            level: proficiencyLevel,
+            assessmentActivities: assessmentData.activities
+          },
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -215,7 +302,7 @@ export default function Profile() {
         setSkills(prevSkills => 
           prevSkills.map(skill => 
             skill._id === editingSkillId 
-              ? { ...skill, level: proficiencyLevel }
+              ? { ...skill, level: proficiencyLevel, assessmentActivities: assessmentData.activities }
               : skill
           )
         );
@@ -228,10 +315,15 @@ export default function Profile() {
         toast.success(`${selectedSkill} updated to ${proficiencyLevel}% proficiency!`);
         setEditingSkillId(null);
       } else {
-        // Add new skill
+        // Add new skill with assessment activities
         const response = await axios.post(
           `${API_BASE_URL}/profile/skills`,
-          { name: selectedSkill, level: proficiencyLevel, category: selectedCategory },
+          { 
+            name: selectedSkill, 
+            level: proficiencyLevel, 
+            category: selectedCategory,
+            assessmentActivities: assessmentData.activities
+          },
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -1460,15 +1552,81 @@ function SkillAssessmentModal({ assessmentData, setAssessmentData, onClose, onCo
   };
 
   const toggleActivity = (level, index) => {
-    setAssessmentData((prev) => ({
-      ...prev,
-      activities: {
-        ...prev.activities,
-        [level]: prev.activities[level].map((activity, i) =>
-          i === index ? { ...activity, checked: !activity.checked } : activity
-        ),
-      },
-    }));
+    // Prevent toggling Intermediate if Beginner requirement not met
+    if (level === 'INTERMEDIATE') {
+      const beginnerChecked = assessmentData.activities.BEGINNER.filter((a) => a.checked).length;
+      const beginnerTotal = assessmentData.activities.BEGINNER.length;
+      const beginnerPercentage = (beginnerChecked / beginnerTotal) * 100;
+      if (beginnerPercentage < 50) {
+        return;
+      }
+    }
+    
+    // Prevent toggling Expert if Intermediate requirement not met
+    if (level === 'EXPERT') {
+      const intermediateChecked = assessmentData.activities.INTERMEDIATE.filter((a) => a.checked).length;
+      const intermediateTotal = assessmentData.activities.INTERMEDIATE.length;
+      const intermediatePercentage = (intermediateChecked / intermediateTotal) * 100;
+      if (intermediatePercentage < 70) {
+        return;
+      }
+    }
+    
+    setAssessmentData((prev) => {
+      const beginnerChecked = prev.activities.BEGINNER.filter((a) => a.checked).length;
+      const beginnerTotal = prev.activities.BEGINNER.length;
+      const intermediateChecked = prev.activities.INTERMEDIATE.filter((a) => a.checked).length;
+      const intermediateTotal = prev.activities.INTERMEDIATE.length;
+      
+      // If unchecking Beginner and it would break Intermediate requirement, uncheck all Intermediate
+      if (level === 'BEGINNER' && prev.activities.BEGINNER[index].checked) {
+        const newBeginnerChecked = beginnerChecked - 1;
+        const newBeginnerPercentage = (newBeginnerChecked / beginnerTotal) * 100;
+        if (newBeginnerPercentage < 50) {
+          // Uncheck all Intermediate activities
+          return {
+            ...prev,
+            activities: {
+              ...prev.activities,
+              BEGINNER: prev.activities.BEGINNER.map((activity, i) =>
+                i === index ? { ...activity, checked: !activity.checked } : activity
+              ),
+              INTERMEDIATE: prev.activities.INTERMEDIATE.map(a => ({ ...a, checked: false })),
+              EXPERT: prev.activities.EXPERT.map(a => ({ ...a, checked: false })),
+            },
+          };
+        }
+      }
+      
+      // If unchecking Intermediate and it would break Expert requirement, uncheck all Expert
+      if (level === 'INTERMEDIATE' && prev.activities.INTERMEDIATE[index].checked) {
+        const newIntermediateChecked = intermediateChecked - 1;
+        const newIntermediatePercentage = (newIntermediateChecked / intermediateTotal) * 100;
+        if (newIntermediatePercentage < 70) {
+          // Uncheck all Expert activities
+          return {
+            ...prev,
+            activities: {
+              ...prev.activities,
+              INTERMEDIATE: prev.activities.INTERMEDIATE.map((activity, i) =>
+                i === index ? { ...activity, checked: !activity.checked } : activity
+              ),
+              EXPERT: prev.activities.EXPERT.map(a => ({ ...a, checked: false })),
+            },
+          };
+        }
+      }
+      
+      return {
+        ...prev,
+        activities: {
+          ...prev.activities,
+          [level]: prev.activities[level].map((activity, i) =>
+            i === index ? { ...activity, checked: !activity.checked } : activity
+          ),
+        },
+      };
+    });
   };
 
   const handleCompleteAssessment = async () => {
@@ -1490,6 +1648,17 @@ function SkillAssessmentModal({ assessmentData, setAssessmentData, onClose, onCo
     assessmentData.activities.BEGINNER.filter((a) => a.checked).length +
     assessmentData.activities.INTERMEDIATE.filter((a) => a.checked).length +
     assessmentData.activities.EXPERT.filter((a) => a.checked).length;
+
+  // Calculate validation requirements
+  const beginnerChecked = assessmentData.activities.BEGINNER.filter((a) => a.checked).length;
+  const beginnerTotal = assessmentData.activities.BEGINNER.length;
+  const beginnerPercentage = (beginnerChecked / beginnerTotal) * 100;
+  const canAccessIntermediate = beginnerPercentage >= 50; // Need at least 50% of Beginner checked
+
+  const intermediateChecked = assessmentData.activities.INTERMEDIATE.filter((a) => a.checked).length;
+  const intermediateTotal = assessmentData.activities.INTERMEDIATE.length;
+  const intermediatePercentage = (intermediateChecked / intermediateTotal) * 100;
+  const canAccessExpert = intermediatePercentage >= 70; // Need at least 70% of Intermediate checked
 
   return (
     <div className="fixed inset-0 z-50">
@@ -1638,20 +1807,38 @@ function SkillAssessmentModal({ assessmentData, setAssessmentData, onClose, onCo
                   {assessmentData.activities.INTERMEDIATE.length}
                 </span>
               </div>
-              <div className="space-y-2 ml-7">
+              {!canAccessIntermediate && (
+                <div className={`ml-7 mb-2 p-2 rounded text-xs ${
+                  isDarkMode 
+                    ? 'bg-warning/10 text-warning border border-warning/20' 
+                    : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                }`}>
+                  ⚠️ Complete at least {Math.ceil(beginnerTotal * 0.5)} of {beginnerTotal} Beginner activities ({Math.ceil(beginnerTotal * 0.5)}/{beginnerTotal}) to unlock Intermediate level
+                </div>
+              )}
+              <div className={`space-y-2 ml-7 ${!canAccessIntermediate ? 'opacity-50' : ''}`}>
                 {assessmentData.activities.INTERMEDIATE.map((activity, index) => (
-                  <label key={index} className="flex items-start gap-3 cursor-pointer group">
+                  <label key={index} className={`flex items-start gap-3 group ${
+                    canAccessIntermediate ? 'cursor-pointer' : 'cursor-not-allowed'
+                  }`}>
                     <input
                       type="checkbox"
                       checked={activity.checked}
                       onChange={() => toggleActivity('INTERMEDIATE', index)}
+                      disabled={!canAccessIntermediate}
                       className={`mt-1 w-4 h-4 rounded focus:ring-2 focus:ring-primary ${
-                        isDarkMode 
-                          ? 'border-border bg-card text-primary' 
-                          : 'border-gray-300 text-blue-600 focus:ring-blue-500'
+                        !canAccessIntermediate 
+                          ? 'cursor-not-allowed opacity-50' 
+                          : isDarkMode 
+                            ? 'border-border bg-card text-primary' 
+                            : 'border-gray-300 text-blue-600 focus:ring-blue-500'
                       }`}
                     />
                     <span className={`text-sm group-hover:opacity-80 ${
+                      !canAccessIntermediate 
+                        ? 'cursor-not-allowed' 
+                        : ''
+                    } ${
                       isDarkMode 
                         ? 'text-muted-foreground group-hover:text-card-foreground' 
                         : 'text-gray-700 group-hover:text-gray-900'
@@ -1683,20 +1870,38 @@ function SkillAssessmentModal({ assessmentData, setAssessmentData, onClose, onCo
                   {assessmentData.activities.EXPERT.length}
                 </span>
               </div>
-              <div className="space-y-2 ml-7">
+              {!canAccessExpert && (
+                <div className={`ml-7 mb-2 p-2 rounded text-xs ${
+                  isDarkMode 
+                    ? 'bg-warning/10 text-warning border border-warning/20' 
+                    : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                }`}>
+                  ⚠️ Complete at least {Math.ceil(intermediateTotal * 0.7)} of {intermediateTotal} Intermediate activities ({Math.ceil(intermediateTotal * 0.7)}/{intermediateTotal}) to unlock Expert level
+                </div>
+              )}
+              <div className={`space-y-2 ml-7 ${!canAccessExpert ? 'opacity-50' : ''}`}>
                 {assessmentData.activities.EXPERT.map((activity, index) => (
-                  <label key={index} className="flex items-start gap-3 cursor-pointer group">
+                  <label key={index} className={`flex items-start gap-3 group ${
+                    canAccessExpert ? 'cursor-pointer' : 'cursor-not-allowed'
+                  }`}>
                     <input
                       type="checkbox"
                       checked={activity.checked}
                       onChange={() => toggleActivity('EXPERT', index)}
+                      disabled={!canAccessExpert}
                       className={`mt-1 w-4 h-4 rounded focus:ring-2 focus:ring-primary ${
-                        isDarkMode 
-                          ? 'border-border bg-card text-primary' 
-                          : 'border-gray-300 text-blue-600 focus:ring-blue-500'
+                        !canAccessExpert 
+                          ? 'cursor-not-allowed opacity-50' 
+                          : isDarkMode 
+                            ? 'border-border bg-card text-primary' 
+                            : 'border-gray-300 text-blue-600 focus:ring-blue-500'
                       }`}
                     />
                     <span className={`text-sm group-hover:opacity-80 ${
+                      !canAccessExpert 
+                        ? 'cursor-not-allowed' 
+                        : ''
+                    } ${
                       isDarkMode 
                         ? 'text-muted-foreground group-hover:text-card-foreground' 
                         : 'text-gray-700 group-hover:text-gray-900'
